@@ -48,7 +48,7 @@ export function BuildYourLoaf() {
       <div className="build-your-loaf-header">
         <h2 className="build-your-loaf-title">Build Your Loaf</h2>
         <p className="build-your-loaf-subtitle">
-          Choose your flour and inclusions. Full and mini loaves share the same build.
+          Choose your size, flour type, and a variety of inclusions.
         </p>
       </div>
 

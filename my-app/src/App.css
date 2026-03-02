@@ -374,6 +374,19 @@ main {
   padding-left: 24px;
 }
 
+@media (max-width: 640px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 32px;
+  }
+
+  .hero-image-cell {
+    padding-left: 0;
+    justify-content: center;
+    min-height: 260px;
+  }
+}
+
 .hero-image-wrap {
   width: 100%;
   aspect-ratio: 4 / 3;
@@ -1722,6 +1735,30 @@ section {
   overflow: visible;
 }
 
+.preorder-product-card .loaf-image-wrap {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 56px;
+  height: 56px;
+  aspect-ratio: 1;
+  margin: 0;
+  border-radius: 999px;
+  overflow: hidden;
+  opacity: 1;
+  pointer-events: none;
+  filter: saturate(0.95) contrast(0.98);
+}
+
+.preorder-product-card--has-banner .loaf-image-wrap {
+  top: 34px;
+}
+
+.preorder-product-card .loaf-image {
+  transform: scale(0.96);
+  border-radius: 999px;
+}
+
 .preorder-product-card--has-banner {
   padding-top: 34px;
 }
@@ -1919,15 +1956,32 @@ section {
 }
 
 .cart-summary {
+  position: relative;
   border-radius: 20px;
   padding: 16px 16px 18px;
   border: 1px solid var(--border-soft);
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.9);
   font-size: 13px;
   color: var(--muted);
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
+}
+
+.cart-summary::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url('/src/images/cartoonimages/baskets.png');
+  background-size: cover;
+  background-position: center;
+  opacity: 0.08;
+  pointer-events: none;
+}
+
+.cart-summary > * {
+  position: relative;
+  z-index: 1;
 }
 
 .cart-items {
@@ -1948,6 +2002,8 @@ section {
   padding: 6px 0;
   border-bottom: 1px solid var(--border-soft);
   font-size: 13px;
+  position: relative;
+  padding-right: 56px;
 }
 
 .cart-item-simple:last-child {
@@ -1977,6 +2033,32 @@ section {
   align-items: center;
   justify-content: center;
   -webkit-tap-highlight-color: transparent;
+}
+
+.cart-item-thumb {
+  position: absolute;
+  top: 4px;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.cart-item-thumb img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.14);
+}
+
+.cart-item-thumb span {
+  font-size: 9px;
+  line-height: 1.1;
+  color: var(--muted);
+  max-width: 60px;
+  text-align: center;
 }
 
 .cart-item-fav .icon-heart {
@@ -2191,6 +2273,29 @@ section {
   padding: 7px 10px;
   font-size: 13px;
   background: #fdfcf9;
+}
+
+.account-form select {
+  border-radius: 999px;
+  border: 1px solid var(--border-soft);
+  padding: 7px 10px;
+  font-size: 13px;
+  background: #fdfcf9;
+}
+
+.account-form-fieldset {
+  border: none;
+  padding: 0;
+  margin: 4px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.account-form-fieldset legend {
+  font-weight: 600;
+  margin-bottom: 2px;
 }
 
 .account-lists {
@@ -2466,6 +2571,16 @@ footer {
   object-fit: cover;
   display: block;
   border-radius: 20px;
+}
+
+.loaf-preview-base--crumb {
+  object-fit: contain;
+}
+
+.loaf-preview-base--crumb-swirl {
+  object-fit: contain;
+  clip-path: circle(46% at 50% 50%);
+  background: transparent;
 }
 
 .loaf-preview-overlay {

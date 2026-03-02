@@ -26,13 +26,18 @@ export function LoafPreview({ size, flour, selectedSweet, selectedSavory, view =
   const cinnamonSwirlSrc = CINNAMON_SWIRL_CRUMB_IMAGES[flour]
 
   const src = useCinnamonSwirlCrumb && cinnamonSwirlSrc ? cinnamonSwirlSrc : basePath
+  const isCrumbView = view === 'crumb'
+  const isCinnamonSwirlCrumb = isCrumbView && useCinnamonSwirlCrumb && !!cinnamonSwirlSrc
+  const baseClassName = `loaf-preview-base${isCrumbView ? ' loaf-preview-base--crumb' : ''}${
+    isCinnamonSwirlCrumb ? ' loaf-preview-base--crumb-swirl' : ''
+  }`
 
   return (
     <div className={`loaf-preview-stack${size === 'mini' ? ' loaf-preview-stack--mini' : ''}`}>
       <img
         src={src}
         alt={`${flour} ${size} loaf`}
-        className="loaf-preview-base"
+        className={baseClassName}
       />
     </div>
   )

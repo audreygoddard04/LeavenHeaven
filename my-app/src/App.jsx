@@ -33,6 +33,7 @@ import collagenboostedloafImg from './images/collagenboostedloaf.png'
 import peanutbutterImg from './images/peanutbutter.png'
 import carrotcakeImg from './images/carrotcake.png'
 import { BuildYourLoaf } from './components/BuildYourLoaf'
+import { supabase } from './lib/supabaseClient'
 
 const LOAF_IMAGES = {
   'classic-country-white': plainwhiteImg,
@@ -379,12 +380,65 @@ function App() {
     navigateTo('preorder')
   }
 
-  const handleLogin = (event) => {
+  const handleLogin = async (event) => {
     event.preventDefault()
     const formData = new FormData(event.currentTarget)
     const name = formData.get('name')?.toString().trim() ?? ''
     const email = formData.get('email')?.toString().trim() ?? ''
-    if (!email) return
+    const password = formData.get('password')?.toString().trim() ?? ''
+    const phone = formData.get('phone')?.toString().trim() ?? ''
+    const city = formData.get('city')?.toString().trim() ?? ''
+    const defaultSize = formData.get('defaultSize')?.toString().trim() || 'loaf'
+    const defaultFlour = formData.get('defaultFlour')?.toString().trim() || 'white'
+
+    if (!email || !password) return
+
+    let userId
+
+    // Try to sign in first; if user doesn't exist, fall back to sign up
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (signInError && signInError.message?.toLowerCase().includes('invalid login credentials')) {
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+      })
+      if (signUpError) {
+        // eslint-disable-next-line no-console
+        console.error('Supabase signUp error', signUpError)
+        return
+      }
+      userId = signUpData.user?.id
+    } else if (signInError) {
+      // eslint-disable-next-line no-console
+      console.error('Supabase signIn error', signInError)
+      return
+    } else {
+      userId = signInData.user?.id
+    }
+
+    if (userId) {
+      const { error: profileError } = await supabase.from('profiles').upsert(
+        {
+          id: userId,
+          email,
+          full_name: name,
+          phone,
+          city,
+          default_loaf_size: defaultSize === 'mini' ? 'mini' : 'full',
+          default_flour: defaultFlour,
+        },
+        { onConflict: 'id' },
+      )
+      if (profileError) {
+        // eslint-disable-next-line no-console
+        console.error('Supabase profile upsert error', profileError)
+      }
+    }
+
     const nextUser = { name, email }
     setUser(nextUser)
     if (typeof window !== 'undefined') {
@@ -771,7 +825,6 @@ function App() {
               <aside className="cart-summary">
                 <div className="cart-summary-heading">
                   <h2 className="cart-summary-title">Cart</h2>
-                  <p className="cart-summary-subtitle">Your pre-order items</p>
                 </div>
                 {cartItems.length === 0 ? (
                   <p className="cart-empty">Your cart is empty.</p>
@@ -816,6 +869,12 @@ function App() {
                       return (
                         <li key={item.key} className="cart-item-simple">
                           <span className="cart-item-label">{sizeLabel} {product.name} Loaf</span>
+                          {LOAF_IMAGES[product.id] && (
+                            <div className="cart-item-thumb">
+                              <img src={LOAF_IMAGES[product.id]} alt={product.name} />
+                              <span>{product.name}</span>
+                            </div>
+                          )}
                           <button
                             type="button"
                             className={`cart-item-fav fav-toggle${isFav ? ' fav-toggle--active' : ''}`}
@@ -866,6 +925,11 @@ function App() {
                     <div key={product.id} className={`preorder-product-card${product.seasonal ? ' preorder-product-card--has-banner' : ''}${product.seasonal && product.season !== getCurrentSeason() ? ' loaf-card--out-of-season' : ''}${product.soldOut ? ' preorder-product-card--sold-out' : ''}`}>
                       {product.seasonal ? <span className="loaf-season-banner">Limited edition</span> : null}
                       {product.soldOut ? <span className="loaf-sold-out-banner">Sold out</span> : null}
+                      {LOAF_IMAGES[product.id] ? (
+                        <div className="loaf-image-wrap">
+                          <img src={LOAF_IMAGES[product.id]} alt="" className="loaf-image" />
+                        </div>
+                      ) : null}
                       <div className="preorder-product-name preorder-product-name--card">
                         {product.name}
                       </div>
@@ -1274,7 +1338,7 @@ function App() {
               <div>
                 <div className="section-label">Build your loaf</div>
                 <div className="section-title">
-                  Choose flour and inclusions. Full and mini share the same build.
+                  Customize YOUR loaf!
                 </div>
               </div>
               <button
@@ -1323,8 +1387,8 @@ function App() {
                 {!user && (
                   <form className="account-form" onSubmit={handleLogin}>
                     <label>
-                      Name (optional)
-                      <input name="name" type="text" autoComplete="name" />
+                      Full name
+                      <input name="name" type="text" autoComplete="name" required />
                     </label>
                     <label>
                       Email
@@ -1335,8 +1399,44 @@ function App() {
                         required
                       />
                     </label>
+                    <label>
+                      Password
+                      <input
+                        name="password"
+                        type="password"
+                        autoComplete="new-password"
+                        required
+                      />
+                    </label>
+                    <label>
+                      Phone (optional)
+                      <input name="phone" type="tel" autoComplete="tel" />
+                    </label>
+                    <label>
+                      City (optional)
+                      <input name="city" type="text" autoComplete="address-level2" />
+                    </label>
+                    <fieldset className="account-form-fieldset">
+                      <legend>Default loaf size</legend>
+                      <label>
+                        <input type="radio" name="defaultSize" value="loaf" defaultChecked />
+                        Full loaf
+                      </label>
+                      <label>
+                        <input type="radio" name="defaultSize" value="mini" />
+                        Mini loaf
+                      </label>
+                    </fieldset>
+                    <label>
+                      Default flour
+                      <select name="defaultFlour" defaultValue="white">
+                        <option value="white">White</option>
+                        <option value="wholewheat">Whole wheat</option>
+                        <option value="rye">Rye</option>
+                      </select>
+                    </label>
                     <button type="submit" className="btn-small">
-                      Sign in
+                      Create or sign in
                     </button>
                   </form>
                 )}
