@@ -2704,6 +2704,37 @@ section {
   margin: 4px 0;
 }
 
+.account-debug {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.account-debug-btn {
+  font-size: 11px;
+  padding: 4px 8px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.account-debug-btn:hover {
+  color: var(--text);
+}
+
+.account-debug-output {
+  margin: 8px 0 0;
+  padding: 8px;
+  font-size: 10px;
+  background: var(--bg-alt);
+  border-radius: 4px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
 .account-lists {
   display: flex;
   flex-direction: column;

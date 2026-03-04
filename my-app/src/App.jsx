@@ -34,7 +34,17 @@ import peanutbutterImg from './images/peanutbutter.png'
 import carrotcakeImg from './images/carrotcake.png'
 import { BuildYourLoaf } from './components/BuildYourLoaf'
 import { supabase } from './lib/supabaseClient'
-import { getCurrentUserAndProfile } from './lib/auth'
+import { useAuth } from './hooks/useAuth'
+
+function getUserDisplay(authUser) {
+  if (!authUser) return null
+  const meta = authUser.user_metadata || {}
+  return {
+    name: meta.full_name ?? meta.name ?? (meta.given_name && meta.family_name ? `${meta.given_name} ${meta.family_name}`.trim() : meta.given_name ?? meta.family_name) ?? authUser.email?.split('@')[0] ?? '',
+    email: authUser.email ?? '',
+    avatar: meta.picture ?? meta.avatar_url ?? null,
+  }
+}
 
 const LOAF_IMAGES = {
   'classic-country-white': plainwhiteImg,
@@ -201,11 +211,17 @@ function getCustomItemPrice(c) {
 }
 
 function App() {
+  const { user: authUser, loading: authLoading } = useAuth()
+  const user = getUserDisplay(authUser) ?? null
+
   const [cartItems, setCartItems] = useState([])
   const [favorites, setFavorites] = useState([])
-  const [user, setUser] = useState(null)
   const [orders, setOrders] = useState([])
-  const [currentPage, setCurrentPage] = useState('home')
+  const [currentPage, setCurrentPage] = useState(() => {
+    if (typeof window === 'undefined') return 'home'
+    const hash = window.location.hash.slice(1) || 'home'
+    return ['home', 'loaves', 'customize', 'preorder', 'favorites', 'account'].includes(hash) ? hash : 'home'
+  })
   const [navOpen, setNavOpen] = useState(false)
   const [includeSample, setIncludeSample] = useState(false)
   const [customSize, setCustomSize] = useState('loaf')
@@ -220,6 +236,7 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showAuthPrompt, setShowAuthPrompt] = useState(false)
   const [accountMode, setAccountMode] = useState('signup') // 'signin' | 'signup'
+  const [authDebug, setAuthDebug] = useState(null)
   const searchRef = useRef(null)
 
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
@@ -250,78 +267,6 @@ function App() {
   }, [])
 
   useEffect(() => {
-    const syncFromSession = (session) => {
-      const authUser = session?.user ?? null
-      if (authUser) {
-        const meta = authUser.user_metadata || {}
-        const name = meta.full_name ?? meta.name ?? (meta.given_name && meta.family_name ? `${meta.given_name} ${meta.family_name}`.trim() : meta.given_name ?? meta.family_name) ?? authUser.email?.split('@')[0] ?? ''
-        const nextUser = {
-          name,
-          email: authUser.email ?? '',
-          avatar: meta.picture ?? meta.avatar_url ?? null,
-        }
-        setUser(nextUser)
-        try {
-          window.localStorage.setItem('lh_user', JSON.stringify(nextUser))
-        } catch {
-          // ignore
-        }
-      } else {
-        setUser(null)
-        try {
-          window.localStorage.removeItem('lh_user')
-        } catch {
-          // ignore
-        }
-      }
-    }
-
-    const syncUserAndProfile = async () => {
-      const { user: authUser, profile } = await getCurrentUserAndProfile()
-      if (authUser) {
-        const meta = authUser.user_metadata || {}
-        const name = profile?.display_name ?? meta.full_name ?? meta.name ?? (meta.given_name && meta.family_name ? `${meta.given_name} ${meta.family_name}`.trim() : meta.given_name ?? meta.family_name) ?? authUser.email?.split('@')[0] ?? ''
-        const nextUser = {
-          name,
-          email: authUser.email ?? '',
-          avatar: meta.picture ?? meta.avatar_url ?? null,
-        }
-        setUser(nextUser)
-        try {
-          window.localStorage.setItem('lh_user', JSON.stringify(nextUser))
-        } catch {
-          // ignore
-        }
-      } else {
-        setUser(null)
-        try {
-          window.localStorage.removeItem('lh_user')
-        } catch {
-          // ignore
-        }
-      }
-    }
-
-    syncUserAndProfile()
-
-    // Retry after OAuth redirect - Supabase may need time to process the URL
-    const retries = [500, 1000, 2000, 3000].map((ms) => setTimeout(syncUserAndProfile, ms))
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
-        syncFromSession(session)
-      } else {
-        syncUserAndProfile()
-      }
-    })
-
-    return () => {
-      retries.forEach(clearTimeout)
-      subscription?.unsubscribe()
-    }
-  }, [])
-
-  useEffect(() => {
     if (typeof window === 'undefined') return
     try {
       window.localStorage.setItem('lh_favorites', JSON.stringify(favorites))
@@ -329,28 +274,6 @@ function App() {
       // ignore
     }
   }, [favorites])
-
-  useEffect(() => {
-    if (currentPage === 'account' && !user) {
-      getCurrentUserAndProfile().then(({ user: authUser, profile }) => {
-        if (authUser) {
-          const meta = authUser.user_metadata || {}
-          const name = profile?.display_name ?? meta.full_name ?? meta.name ?? (meta.given_name && meta.family_name ? `${meta.given_name} ${meta.family_name}`.trim() : meta.given_name ?? meta.family_name) ?? authUser.email?.split('@')[0] ?? ''
-          const nextUser = {
-            name,
-            email: authUser.email ?? '',
-            avatar: meta.picture ?? meta.avatar_url ?? null,
-          }
-          setUser(nextUser)
-          try {
-            window.localStorage.setItem('lh_user', JSON.stringify(nextUser))
-          } catch {
-            // ignore
-          }
-        }
-      })
-    }
-  }, [currentPage, user])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -523,25 +446,10 @@ function App() {
     const password = formData.get('password')?.toString().trim() ?? ''
     if (!email || !password) return
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
       // eslint-disable-next-line no-console
       console.error('Sign in error', error)
-      return
-    }
-    if (data?.user) {
-      const { user: authUser, profile } = await getCurrentUserAndProfile()
-      if (authUser) {
-        const meta = authUser.user_metadata || {}
-        const name = profile?.display_name ?? meta.full_name ?? meta.name ?? authUser.email?.split('@')[0] ?? ''
-        const nextUser = { name, email: authUser.email ?? '', avatar: meta.picture ?? meta.avatar_url ?? null }
-        setUser(nextUser)
-        try {
-          window.localStorage.setItem('lh_user', JSON.stringify(nextUser))
-        } catch {
-          // ignore
-        }
-      }
     }
   }
 
@@ -573,15 +481,6 @@ function App() {
         // eslint-disable-next-line no-console
         console.error('Profile upsert error', profileError)
       }
-      if (data.session) {
-        const nextUser = { name: name || email?.split('@')[0], email, avatar: null }
-        setUser(nextUser)
-        try {
-          window.localStorage.setItem('lh_user', JSON.stringify(nextUser))
-        } catch {
-          // ignore
-        }
-      }
     }
   }
 
@@ -589,7 +488,7 @@ function App() {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: typeof window !== 'undefined' ? window.location.origin + window.location.pathname : undefined,
+        redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/?next=account` : undefined,
       },
     })
   }
@@ -598,9 +497,28 @@ function App() {
     setCurrentPage(page)
     setNavOpen(false)
     if (typeof window !== 'undefined') {
+      window.location.hash = page
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('next') === 'account') {
+      setCurrentPage('account')
+    }
+  }, [])
+
+  useEffect(() => {
+    const onHashChange = () => {
+      const hash = window.location.hash.slice(1) || 'home'
+      if (['home', 'loaves', 'customize', 'preorder', 'favorites', 'account'].includes(hash)) {
+        setCurrentPage(hash)
+      }
+    }
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
+  }, [])
 
   return (
     <>
@@ -1717,9 +1635,11 @@ function App() {
             <div className="info-grid">
               <div className="info-card">
                 <div className="mission-title">
-                  {user ? 'Account details' : 'Sign in to your account'}
+                  {authLoading ? 'Loading...' : user ? 'Account details' : 'Sign in to your account'}
                 </div>
-                {user ? (
+                {authLoading ? (
+                  <p className="account-summary">Checking session...</p>
+                ) : user ? (
                   <div className="account-details">
                     {user.avatar && (
                       <img src={user.avatar} alt="" className="account-avatar" />
@@ -1821,11 +1741,38 @@ function App() {
                     )}
                   </>
                 )}
-                {user && (
+                {!authLoading && user && (
                   <p className="account-summary">
                     Your pre-orders will be saved on this device.
                   </p>
                 )}
+                <div className="account-debug">
+                  <button
+                    type="button"
+                    className="account-debug-btn"
+                    onClick={async () => {
+                      const [sessionRes, userRes] = await Promise.all([
+                        supabase.auth.getSession(),
+                        supabase.auth.getUser(),
+                      ])
+                      const sbKeys = typeof window !== 'undefined'
+                        ? Object.keys(localStorage).filter((k) => k.startsWith('sb-'))
+                        : []
+                      setAuthDebug({
+                        getSession: sessionRes.data?.session ? 'has session' : 'null',
+                        getUser: userRes.data?.user ? 'has user' : 'null',
+                        localStorageKeys: sbKeys,
+                      })
+                    }}
+                  >
+                    Debug auth
+                  </button>
+                  {authDebug && (
+                    <pre className="account-debug-output">
+                      {JSON.stringify(authDebug, null, 2)}
+                    </pre>
+                  )}
+                </div>
               </div>
 
               <div className="info-card">
