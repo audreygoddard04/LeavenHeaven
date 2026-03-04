@@ -12,16 +12,13 @@
     sans-serif;
 }
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 
-button:focus,
-button:focus-visible,
-button:hover {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
 
 body {
   margin: 0;
@@ -336,8 +333,8 @@ main {
 .nav-favorites:focus-visible,
 .nav-cart:focus,
 .nav-cart:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: none;
 }
 
 .search-dropdown {
@@ -564,8 +561,8 @@ main {
 
 .main-nav button:focus,
 .main-nav button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: none;
 }
 
 .pill {
@@ -890,8 +887,8 @@ main {
 
 .header-offer-bar-btn:focus,
 .header-offer-bar-btn:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: none;
 }
 
 .header-offer-bar-btn:hover {
@@ -2206,6 +2203,16 @@ section {
   flex-shrink: 0;
 }
 
+.btn-add:focus,
+.btn-add:focus-visible,
+.btn-add:hover:not(:disabled),
+.build-your-loaf-add-btn:focus,
+.build-your-loaf-add-btn:focus-visible,
+.build-your-loaf-add-btn:hover {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .fav-toggle {
   border-radius: 999px;
   padding: 6px;
@@ -2227,6 +2234,13 @@ section {
   border-color: var(--accent);
   background: var(--accent-soft);
   color: #c66a6a;
+}
+
+.fav-toggle:focus,
+.fav-toggle:focus-visible,
+.fav-toggle:hover {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .cart-summary-heading {
@@ -2510,6 +2524,13 @@ section {
   padding-left: 2px;
 }
 
+.btn-sample:focus,
+.btn-sample:focus-visible,
+.btn-sample:hover:not(:disabled) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .btn-sample:disabled {
   opacity: 0.5;
   cursor: default;
@@ -2609,6 +2630,13 @@ section {
   margin-top: 8px;
 }
 
+.account-form button:focus,
+.account-form button:focus-visible,
+.account-form button:hover {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .account-form label {
   font-size: 12px;
   color: var(--muted);
@@ -2692,8 +2720,8 @@ section {
 
 .account-mode-btn:focus,
 .account-mode-btn:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: none;
 }
 
 .account-mode-btn.is-active {
