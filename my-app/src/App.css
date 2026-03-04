@@ -16,6 +16,13 @@
   box-sizing: border-box;
 }
 
+button:focus,
+button:focus-visible,
+button:hover {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 body {
   margin: 0;
   padding: 0;
@@ -329,8 +336,8 @@ main {
 .nav-favorites:focus-visible,
 .nav-cart:focus,
 .nav-cart:focus-visible {
-  outline: none;
-  box-shadow: none;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .search-dropdown {
@@ -557,8 +564,8 @@ main {
 
 .main-nav button:focus,
 .main-nav button:focus-visible {
-  outline: none;
-  box-shadow: none;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .pill {
@@ -883,8 +890,8 @@ main {
 
 .header-offer-bar-btn:focus,
 .header-offer-bar-btn:focus-visible {
-  outline: none;
-  box-shadow: none;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .header-offer-bar-btn:hover {
@@ -1874,6 +1881,27 @@ section {
   color: #214535;
 }
 
+.customize-save-row {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-soft);
+  display: flex;
+  justify-content: center;
+}
+
+.fav-toggle--customize {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+}
+
+.fav-toggle--customize .icon-heart {
+  width: 20px;
+  height: 20px;
+}
+
 .customize-actions-row {
   display: flex;
   flex-wrap: wrap;
@@ -2664,8 +2692,8 @@ section {
 
 .account-mode-btn:focus,
 .account-mode-btn:focus-visible {
-  outline: none;
-  box-shadow: none;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .account-mode-btn.is-active {
@@ -2702,37 +2730,6 @@ section {
   font-size: 12px;
   color: var(--muted);
   margin: 4px 0;
-}
-
-.account-debug {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border-soft);
-}
-
-.account-debug-btn {
-  font-size: 11px;
-  padding: 4px 8px;
-  background: var(--bg-alt);
-  border: 1px solid var(--border-soft);
-  border-radius: 4px;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.account-debug-btn:hover {
-  color: var(--text);
-}
-
-.account-debug-output {
-  margin: 8px 0 0;
-  padding: 8px;
-  font-size: 10px;
-  background: var(--bg-alt);
-  border-radius: 4px;
-  overflow-x: auto;
-  white-space: pre-wrap;
-  word-break: break-all;
 }
 
 .account-lists {

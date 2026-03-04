@@ -236,7 +236,6 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showAuthPrompt, setShowAuthPrompt] = useState(false)
   const [accountMode, setAccountMode] = useState('signup') // 'signin' | 'signup'
-  const [authDebug, setAuthDebug] = useState(null)
   const searchRef = useRef(null)
 
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
@@ -1536,25 +1535,28 @@ function App() {
             id="customize"
             className={currentPage === 'customize' ? '' : 'is-hidden'}
           >
-            <div className="section-heading section-heading--with-fav">
+            <div className="section-heading">
               <div>
                 <div className="section-label">Build your loaf</div>
                 <div className="section-title">
                   Customize your own loaf!
                 </div>
               </div>
+            </div>
+            <BuildYourLoaf />
+            <div className="customize-save-row">
               <button
                 type="button"
-                className={`fav-toggle fav-toggle--section${favorites.includes('custom') ? ' fav-toggle--active' : ''}`}
+                className={`fav-toggle fav-toggle--customize${favorites.includes('custom') ? ' fav-toggle--active' : ''}`}
                 onClick={() => toggleFavorite('custom')}
-                aria-label={favorites.includes('custom') ? 'Remove custom loaf from favorites' : 'Add custom loaf to favorites'}
+                aria-label={favorites.includes('custom') ? 'Remove custom loaf from favorites' : 'Save custom loaf to favorites'}
               >
                 <svg className="icon-heart" viewBox="0 0 24 24" fill={favorites.includes('custom') ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                 </svg>
+                <span>{favorites.includes('custom') ? 'Saved to favorites' : 'Save loaf to favorites'}</span>
               </button>
             </div>
-            <BuildYourLoaf />
           </section>
 
           <section
@@ -1746,33 +1748,6 @@ function App() {
                     Your pre-orders will be saved on this device.
                   </p>
                 )}
-                <div className="account-debug">
-                  <button
-                    type="button"
-                    className="account-debug-btn"
-                    onClick={async () => {
-                      const [sessionRes, userRes] = await Promise.all([
-                        supabase.auth.getSession(),
-                        supabase.auth.getUser(),
-                      ])
-                      const sbKeys = typeof window !== 'undefined'
-                        ? Object.keys(localStorage).filter((k) => k.startsWith('sb-'))
-                        : []
-                      setAuthDebug({
-                        getSession: sessionRes.data?.session ? 'has session' : 'null',
-                        getUser: userRes.data?.user ? 'has user' : 'null',
-                        localStorageKeys: sbKeys,
-                      })
-                    }}
-                  >
-                    Debug auth
-                  </button>
-                  {authDebug && (
-                    <pre className="account-debug-output">
-                      {JSON.stringify(authDebug, null, 2)}
-                    </pre>
-                  )}
-                </div>
               </div>
 
               <div className="info-card">
