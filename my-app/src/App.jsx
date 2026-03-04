@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import './App.css'
 import heroLoavesImage from './images/manylaoves.jpeg'
 import plainwhiteImg from './images/plainwhite.png'
@@ -47,7 +47,6 @@ const LOAF_IMAGES = {
   'cinnamon-swirl': cinnamonswirlImg,
   'everything-bagel': everythingbagelImg,
   'lemon-poppyseed': lemonpoppyseedImg,
-  'oats-honey': honeyoatImg,
   'chocolate': doublechocolateImg,
   'croissant': croissantImg,
   'cranberry-walnut': crandberrywalnutImg,
@@ -114,7 +113,6 @@ const loafProducts = [
   { id: 'cinnamon-swirl', name: 'Cinnamon Swirl', description: 'Ribbons of cinnamon sugar swirled through tender sourdough for a sweet, cozy loaf that’s perfect for toast or snacking.', inclusion: 'cinnamon sugar' },
   { id: 'everything-bagel', name: 'Everything Bagel', description: 'Topped and folded with everything bagel seasoning—sesame, poppy, garlic, onion, and salt—for bold, savory flavor in every slice.', inclusion: 'everything bagel seasoning' },
   { id: 'lemon-poppyseed', name: 'Lemon Poppyseed', description: 'Bright lemon zest and poppy seeds baked into the crumb for a light, citrusy loaf with subtle crunch and a fresh finish.', inclusion: 'lemon zest, poppy seeds' },
-  { id: 'oats-honey', name: 'Oats and Honey', description: 'Golden honey and rolled oats incorporated into the dough for gentle sweetness, soft texture, and a comforting slice any time of year.', inclusion: 'honey, oats' },
   { id: 'pizza-loaf', name: 'Pizza Loaf', description: 'Rustic sourdough topped with melted cheese, pepperoni, and pizza sauce for a savory, crowd-pleasing loaf that tastes like your favorite slice.', inclusion: 'mozzarella, pepperoni, pizza sauce' },
   { id: 'pumpkin-spice', name: 'Pumpkin Spice', description: 'Pumpkin purée blended with cinnamon, nutmeg, and clove for a soft, warmly spiced seasonal favorite.', inclusion: 'pumpkin purée, warm spices', seasonal: true, season: 'fall' },
   { id: 'apple-cinnamon', name: 'Apple Cinnamon', description: 'Tender apple pieces folded with cinnamon for comforting sweetness and bakery-fresh aroma.', inclusion: 'apple, cinnamon', seasonal: true, season: 'fall' },
@@ -143,6 +141,9 @@ const loafProducts = [
   { id: 'collagen-boost-loaf', name: 'Collagen Boost Loaf', description: 'Unflavored collagen peptides in the dough. Less drying than whey, with beauty and gut health properties.', proteinCategory: 'advanced' },
   { id: 'egg-white-protein-loaf', name: 'Egg White Protein Loaf', description: 'Some water replaced with liquid egg whites. Higher protein without powder texture and a soft crumb.', proteinCategory: 'advanced' },
 ]
+
+const MOST_POPULAR_IDS = ['greek-yogurt-sourdough', 'cinnamon-swirl', 'rosemary']
+const DEFAULT_MORE_IDS = ['classic-country-white', 'jalapeno-cheddar', 'chocolate']
 
 const FLOUR_OPTIONS = ['White', 'Whole wheat', 'Rye']
 
@@ -214,8 +215,19 @@ function App() {
   const [sweetSearch, setSweetSearch] = useState('')
   const [savorySearch, setSavorySearch] = useState('')
   const [customProteinEnhancement, setCustomProteinEnhancement] = useState(null)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const searchRef = useRef(null)
 
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
+
+  const searchResults = searchQuery.trim() === ''
+    ? [...MOST_POPULAR_IDS, ...DEFAULT_MORE_IDS]
+        .map((id) => loafProducts.find((p) => p.id === id))
+        .filter(Boolean)
+    : loafProducts.filter((p) =>
+        p.name.toLowerCase().includes(searchQuery.toLowerCase()),
+      )
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -254,6 +266,24 @@ function App() {
       // ignore
     }
   }, [orders])
+
+  useEffect(() => {
+    if (!searchOpen) return
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') setSearchOpen(false)
+    }
+    const handleClickOutside = (e) => {
+      if (searchRef.current && !searchRef.current.contains(e.target)) {
+        setSearchOpen(false)
+      }
+    }
+    document.addEventListener('keydown', handleEscape)
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('keydown', handleEscape)
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [searchOpen])
 
   const addLoafToCartWithQuantity = (productId, size) => {
     addToCart(productId, size, 1)
@@ -491,23 +521,58 @@ function App() {
                   >
                     Customize your loaf
                   </button>
-                  <button
-                    type="button"
-                    className={currentPage === 'account' ? 'is-active' : ''}
-                    onClick={() => navigateTo('account')}
-                  >
-                    My account
-                  </button>
-                  <button
-                    type="button"
-                    className="nav-favorites"
-                    onClick={() => navigateTo('account')}
-                    aria-label="View favorites"
-                  >
-                    <svg className="icon-heart-nav" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                    </svg>
-                  </button>
+                  <div className="nav-search-wrap" ref={searchRef}>
+                    {searchOpen && (
+                      <input
+                        type="search"
+                        className="nav-search-input"
+                        placeholder="Search loaves..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        autoFocus
+                        aria-label="Search loaves"
+                      />
+                    )}
+                    <button
+                      type="button"
+                      className={`nav-search${searchOpen ? ' nav-search--active' : ''}`}
+                      onClick={() => setSearchOpen((o) => !o)}
+                      aria-label="Search"
+                      aria-expanded={searchOpen}
+                    >
+                      <svg className="icon-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                      </svg>
+                    </button>
+                    {searchOpen && (
+                      <div className="search-dropdown">
+                        <div className="search-dropdown-results">
+                          {searchResults.length === 0 ? (
+                            <div className="search-dropdown-empty">No loaves found</div>
+                          ) : (
+                            searchResults.map((product) => (
+                              <button
+                                key={product.id}
+                                type="button"
+                                className="search-dropdown-item"
+                                onClick={() => {
+                                  navigateTo('loaves')
+                                  setSearchOpen(false)
+                                  setSearchQuery('')
+                                }}
+                              >
+                                {LOAF_IMAGES[product.id] && (
+                                  <img src={LOAF_IMAGES[product.id]} alt="" className="search-dropdown-item-img" />
+                                )}
+                                <span className="search-dropdown-item-name">{product.name}</span>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   <button
                     type="button"
                     className="nav-cart"
@@ -522,6 +587,27 @@ function App() {
                       </svg>
                       {cartCount > 0 && <span className="nav-cart-count" aria-hidden="true">{cartCount}</span>}
                     </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="nav-favorites"
+                    onClick={() => navigateTo('favorites')}
+                    aria-label="View favorites"
+                  >
+                    <svg className="icon-heart-nav" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    className="nav-user"
+                    onClick={() => navigateTo('account')}
+                    aria-label="My account"
+                  >
+                    <svg className="icon-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="8" r="4" />
+                      <path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
+                    </svg>
                   </button>
                 </nav>
                 <button
@@ -560,19 +646,13 @@ function App() {
                   </button>
                   <button
                     type="button"
-                    className={currentPage === 'account' ? 'is-active' : ''}
-                    onClick={() => navigateTo('account')}
+                    className="nav-search"
+                    onClick={() => setSearchOpen(true)}
+                    aria-label="Search"
                   >
-                    My account
-                  </button>
-                  <button
-                    type="button"
-                    className="nav-favorites"
-                    onClick={() => navigateTo('account')}
-                    aria-label="View favorites"
-                  >
-                    <svg className="icon-heart-nav" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                    <svg className="icon-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <circle cx="11" cy="11" r="8" />
+                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
                     </svg>
                   </button>
                   <button
@@ -590,10 +670,71 @@ function App() {
                       {cartCount > 0 && <span className="nav-cart-count" aria-hidden="true">{cartCount}</span>}
                     </span>
                   </button>
+                  <button
+                    type="button"
+                    className="nav-favorites"
+                    onClick={() => navigateTo('favorites')}
+                    aria-label="View favorites"
+                  >
+                    <svg className="icon-heart-nav" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    className="nav-user"
+                    onClick={() => navigateTo('account')}
+                    aria-label="My account"
+                  >
+                    <svg className="icon-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="8" r="4" />
+                      <path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
+                    </svg>
+                  </button>
                 </nav>
               ) : null}
             </div>
           </header>
+
+          {searchOpen && (
+            <div className="search-overlay-mobile" role="dialog" aria-label="Search loaves">
+              <div className="search-overlay-mobile-backdrop" onClick={() => setSearchOpen(false)} aria-hidden="true" />
+              <div className="search-overlay-mobile-panel">
+                <input
+                  type="search"
+                  className="nav-search-input"
+                  placeholder="Search loaves..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  autoFocus
+                  aria-label="Search loaves"
+                />
+                <div className="search-dropdown-results">
+                  {searchResults.length === 0 ? (
+                    <div className="search-dropdown-empty">No loaves found</div>
+                  ) : (
+                    searchResults.map((product) => (
+                      <button
+                        key={product.id}
+                        type="button"
+                        className="search-dropdown-item"
+                        onClick={() => {
+                          navigateTo('loaves')
+                          setSearchOpen(false)
+                          setSearchQuery('')
+                        }}
+                      >
+                        {LOAF_IMAGES[product.id] && (
+                          <img src={LOAF_IMAGES[product.id]} alt="" className="search-dropdown-item-img" />
+                        )}
+                        <span className="search-dropdown-item-name">{product.name}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="header-offer-bar">
             <button
@@ -1068,9 +1209,7 @@ function App() {
                 <div className="section-label">Loaves</div>
                 <div className="section-title">Signature sourdough flavors.</div>
               </div>
-              <div className="section-caption">
-                Available as full loaves or mini loaves.
-              </div>
+              <div className="section-caption">              </div>
             </div>
 
             <div className="loaves-grid">
@@ -1338,7 +1477,7 @@ function App() {
               <div>
                 <div className="section-label">Build your loaf</div>
                 <div className="section-title">
-                  Customize YOUR loaf!
+                  Customize your own loaf!
                 </div>
               </div>
               <button
@@ -1356,6 +1495,55 @@ function App() {
           </section>
 
           <section
+            id="favorites"
+            className={currentPage === 'favorites' ? '' : 'is-hidden'}
+          >
+            <div className="section-heading">
+              <div>
+                <div className="section-label">Favorites</div>
+                <div className="section-title">
+                  Your favorite flavors.
+                </div>
+              </div>
+            </div>
+
+            <div className="info-grid">
+              <div className="info-card">
+                <div className="mission-title">
+                  Favorite flavors
+                </div>
+                {favorites.length === 0 ? (
+                  <p className="account-summary">
+                    Tap &quot;Save&quot; on any loaf in the pre-order section to
+                    mark it as a favorite.
+                  </p>
+                ) : (
+                  <div className="chip-row">
+                    {favorites.map((id) => {
+                      if (id === 'custom') {
+                        return (
+                          <span key={id} className="chip">
+                            Custom loaf
+                          </span>
+                        )
+                      }
+                      const product = loafProducts.find(
+                        (p) => p.id === id,
+                      )
+                      if (!product) return null
+                      return (
+                        <span key={id} className="chip">
+                          {product.name}
+                        </span>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+
+          <section
             id="account"
             className={currentPage === 'account' ? '' : 'is-hidden'}
           >
@@ -1363,7 +1551,7 @@ function App() {
               <div>
                 <div className="section-label">My account</div>
                 <div className="section-title">
-                  My account, favorites &amp; past orders.
+                  Account details &amp; past orders.
                 </div>
               </div>
             </div>
@@ -1381,7 +1569,7 @@ function App() {
                 ) : (
                   <p className="account-meta">
                     We keep it simple: sign in with your name and email so your
-                    favorites and pre-orders stay with you.
+                    pre-orders stay with you.
                   </p>
                 )}
                 {!user && (
@@ -1442,18 +1630,17 @@ function App() {
                 )}
                 {user && (
                   <p className="account-summary">
-                    Your favorites and pre-orders will be saved on this device.
+                    Your pre-orders will be saved on this device.
                   </p>
                 )}
               </div>
 
               <div className="info-card">
                 <div className="mission-title">
-                  Favorites &amp; past pre-orders
+                  Past pre-orders
                 </div>
                 <div className="account-lists">
-                  <div>
-                    <p className="account-meta">Favorite flavors</p>
+                  <div className="account-favorites-removed">
                     {favorites.length === 0 ? (
                       <p className="account-summary">
                         Tap “Save” on any loaf in the pre-order section to
