@@ -1,0 +1,115 @@
+import { Router, Request, Response } from 'express'
+import Stripe from 'stripe'
+import { stripe } from '../lib/stripe.js'
+import { supabase } from '../lib/supabase.js'
+
+export const webhookRouter = Router()
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET ?? ''
+
+webhookRouter.post('/', async (req: Request, res: Response) => {
+  if (!stripe || !webhookSecret) {
+    res.status(500).json({ error: 'Webhook not configured' })
+    return
+  }
+
+  const sig = req.headers['stripe-signature']
+  if (!sig || typeof sig !== 'string') {
+    res.status(400).json({ error: 'Missing stripe-signature' })
+    return
+  }
+
+  let event: Stripe.Event
+  try {
+    event = stripe.webhooks.constructEvent(
+      (req as Request & { body: Buffer }).body,
+      sig,
+      webhookSecret
+    )
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    console.error('Webhook signature verification failed:', message)
+    res.status(400).json({ error: `Webhook Error: ${message}` })
+    return
+  }
+
+  if (!supabase) {
+    res.status(500).json({ error: 'Supabase not configured' })
+    return
+  }
+
+  try {
+    switch (event.type) {
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated': {
+        const sub = event.data.object as Stripe.Subscription
+        const customerId = sub.customer as string
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('stripe_customer_id', customerId)
+          .single()
+
+        if (profile) {
+          const periodEnd = sub.current_period_end
+            ? new Date(sub.current_period_end * 1000).toISOString()
+            : null
+          await supabase.from('subscriptions').upsert(
+            {
+              user_id: profile.id,
+              status: sub.status,
+              current_period_end: periodEnd,
+              plan: 'weekly_loaf',
+              stripe_subscription_id: sub.id,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'user_id' }
+          )
+        }
+        break
+      }
+
+      case 'customer.subscription.deleted': {
+        const sub = event.data.object as Stripe.Subscription
+        const customerId = sub.customer as string
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('stripe_customer_id', customerId)
+          .single()
+
+        if (profile) {
+          await supabase
+            .from('subscriptions')
+            .update({
+              status: 'canceled',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('user_id', profile.id)
+        }
+        break
+      }
+
+      case 'payment_intent.succeeded': {
+        const pi = event.data.object as Stripe.PaymentIntent
+        const orderId = pi.metadata?.order_id
+        if (orderId && supabase) {
+          await supabase.from('orders').update({ status: 'paid' }).eq('id', orderId)
+        }
+        break
+      }
+
+      case 'invoice.paid':
+      case 'invoice.payment_failed':
+        // Optional: log or handle
+        break
+
+      default:
+        break
+    }
+
+    res.json({ received: true })
+  } catch (err) {
+    console.error('Webhook handler error:', err)
+    res.status(500).json({ error: 'Webhook handler failed' })
+  }
+})

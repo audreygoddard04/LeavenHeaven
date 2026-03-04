@@ -395,6 +395,111 @@ main {
   text-transform: none;
 }
 
+/* Auth prompt modal (sign in to save favorites) */
+.auth-prompt-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.auth-prompt-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+
+.auth-prompt-panel {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  background: #fdfcf9;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  padding: 28px;
+  border: 1px solid var(--border-soft);
+}
+
+.auth-prompt-title {
+  margin: 0 0 12px;
+  font-family: var(--font-heading);
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.auth-prompt-text {
+  margin: 0 0 24px;
+  font-size: 0.95rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.auth-prompt-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.auth-prompt-btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.auth-prompt-btn--primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.auth-prompt-btn--primary:hover {
+  background: #c9985a;
+  border-color: #c9985a;
+}
+
+.auth-prompt-btn--secondary {
+  background: transparent;
+  color: var(--muted);
+  border-color: var(--border-soft);
+}
+
+.auth-prompt-btn--secondary:hover {
+  background: var(--bg-alt);
+  color: var(--text);
+}
+
+.auth-prompt-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.auth-prompt-inline-btn {
+  align-self: flex-start;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  background: var(--accent);
+  color: #fff;
+  border: 1px solid var(--accent);
+  transition: background 0.2s;
+}
+
+.auth-prompt-inline-btn:hover {
+  background: #c9985a;
+}
+
 .search-overlay-mobile {
   display: none;
 }

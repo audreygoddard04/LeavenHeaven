@@ -217,6 +217,7 @@ function App() {
   const [customProteinEnhancement, setCustomProteinEnhancement] = useState(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [showAuthPrompt, setShowAuthPrompt] = useState(false)
   const searchRef = useRef(null)
 
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
@@ -391,11 +392,23 @@ function App() {
   }
 
   const toggleFavorite = (productId) => {
+    if (!user) {
+      setShowAuthPrompt(true)
+      return
+    }
     setFavorites((prev) =>
       prev.includes(productId)
         ? prev.filter((id) => id !== productId)
         : [...prev, productId],
     )
+  }
+
+  const handleFavoritesNav = () => {
+    if (!user) {
+      setShowAuthPrompt(true)
+      return
+    }
+    navigateTo('favorites')
   }
 
   const addCustomToCart = () => {
@@ -418,9 +431,6 @@ function App() {
     const password = formData.get('password')?.toString().trim() ?? ''
     const phone = formData.get('phone')?.toString().trim() ?? ''
     const city = formData.get('city')?.toString().trim() ?? ''
-    const defaultSize = formData.get('defaultSize')?.toString().trim() || 'loaf'
-    const defaultFlour = formData.get('defaultFlour')?.toString().trim() || 'white'
-
     if (!email || !password) return
 
     let userId
@@ -458,8 +468,8 @@ function App() {
           full_name: name,
           phone,
           city,
-          default_loaf_size: defaultSize === 'mini' ? 'mini' : 'full',
-          default_flour: defaultFlour,
+          default_loaf_size: 'full',
+          default_flour: 'white',
         },
         { onConflict: 'id' },
       )
@@ -591,7 +601,7 @@ function App() {
                   <button
                     type="button"
                     className="nav-favorites"
-                    onClick={() => navigateTo('favorites')}
+                    onClick={handleFavoritesNav}
                     aria-label="View favorites"
                   >
                     <svg className="icon-heart-nav" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -673,7 +683,7 @@ function App() {
                   <button
                     type="button"
                     className="nav-favorites"
-                    onClick={() => navigateTo('favorites')}
+                    onClick={handleFavoritesNav}
                     aria-label="View favorites"
                   >
                     <svg className="icon-heart-nav" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -695,6 +705,37 @@ function App() {
               ) : null}
             </div>
           </header>
+
+          {showAuthPrompt && (
+            <div className="auth-prompt-overlay" role="dialog" aria-label="Sign in to save favorites">
+              <div className="auth-prompt-backdrop" onClick={() => setShowAuthPrompt(false)} aria-hidden="true" />
+              <div className="auth-prompt-panel">
+                <h3 className="auth-prompt-title">Sign in to save favorites</h3>
+                <p className="auth-prompt-text">
+                  Create an account or sign in to save your favorite loaves.
+                </p>
+                <div className="auth-prompt-actions">
+                  <button
+                    type="button"
+                    className="auth-prompt-btn auth-prompt-btn--primary"
+                    onClick={() => {
+                      setShowAuthPrompt(false)
+                      navigateTo('account')
+                    }}
+                  >
+                    Sign in / Sign up
+                  </button>
+                  <button
+                    type="button"
+                    className="auth-prompt-btn auth-prompt-btn--secondary"
+                    onClick={() => setShowAuthPrompt(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {searchOpen && (
             <div className="search-overlay-mobile" role="dialog" aria-label="Search loaves">
@@ -1512,7 +1553,20 @@ function App() {
                 <div className="mission-title">
                   Favorite flavors
                 </div>
-                {favorites.length === 0 ? (
+                {!user ? (
+                  <div className="auth-prompt-inline">
+                    <p className="account-summary">
+                      Sign in or create an account to save your favorite loaves.
+                    </p>
+                    <button
+                      type="button"
+                      className="auth-prompt-inline-btn"
+                      onClick={() => navigateTo('account')}
+                    >
+                      Sign in / Sign up
+                    </button>
+                  </div>
+                ) : favorites.length === 0 ? (
                   <p className="account-summary">
                     Tap &quot;Save&quot; on any loaf in the pre-order section to
                     mark it as a favorite.
@@ -1603,25 +1657,6 @@ function App() {
                     <label>
                       City (optional)
                       <input name="city" type="text" autoComplete="address-level2" />
-                    </label>
-                    <fieldset className="account-form-fieldset">
-                      <legend>Default loaf size</legend>
-                      <label>
-                        <input type="radio" name="defaultSize" value="loaf" defaultChecked />
-                        Full loaf
-                      </label>
-                      <label>
-                        <input type="radio" name="defaultSize" value="mini" />
-                        Mini loaf
-                      </label>
-                    </fieldset>
-                    <label>
-                      Default flour
-                      <select name="defaultFlour" defaultValue="white">
-                        <option value="white">White</option>
-                        <option value="wholewheat">Whole wheat</option>
-                        <option value="rye">Rye</option>
-                      </select>
                     </label>
                     <button type="submit" className="btn-small">
                       Create or sign in
