@@ -2527,6 +2527,48 @@ section {
   margin-bottom: 8px;
 }
 
+.account-details {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.account-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.account-details-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.account-detail-row {
+  margin: 0;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.account-detail-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.account-detail-value {
+  font-weight: 500;
+  color: var(--text);
+}
+
 .account-summary {
   font-size: 13px;
   color: var(--muted);
@@ -2576,6 +2618,90 @@ section {
 .account-form-fieldset legend {
   font-weight: 600;
   margin-bottom: 2px;
+}
+
+.account-mode-toggle {
+  display: flex;
+  gap: 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.account-mode-btn {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  background: none;
+  border: none;
+  border-radius: 0;
+  margin-bottom: -1px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.2s;
+  position: relative;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.account-mode-btn::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: transparent;
+  transition: background 0.2s;
+}
+
+.account-mode-btn:hover {
+  color: var(--text);
+}
+
+.account-mode-btn:hover::after {
+  background: var(--border-soft);
+}
+
+.account-mode-btn:focus,
+.account-mode-btn:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.account-mode-btn.is-active {
+  color: var(--text);
+}
+
+.account-mode-btn.is-active::after {
+  background: var(--accent);
+}
+
+.account-mode-switch {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.account-mode-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.account-mode-link:hover {
+  color: #c9985a;
+}
+
+.account-form-divider {
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  margin: 4px 0;
 }
 
 .account-lists {

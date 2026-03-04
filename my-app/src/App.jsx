@@ -34,6 +34,7 @@ import peanutbutterImg from './images/peanutbutter.png'
 import carrotcakeImg from './images/carrotcake.png'
 import { BuildYourLoaf } from './components/BuildYourLoaf'
 import { supabase } from './lib/supabaseClient'
+import { getCurrentUserAndProfile } from './lib/auth'
 
 const LOAF_IMAGES = {
   'classic-country-white': plainwhiteImg,
@@ -218,6 +219,7 @@ function App() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showAuthPrompt, setShowAuthPrompt] = useState(false)
+  const [accountMode, setAccountMode] = useState('signup') // 'signin' | 'signup'
   const searchRef = useRef(null)
 
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
@@ -233,20 +235,89 @@ function App() {
   useEffect(() => {
     if (typeof window === 'undefined') return
     try {
-      const storedUser = window.localStorage.getItem('lh_user')
       const storedFavs = window.localStorage.getItem('lh_favorites')
       const storedOrders = window.localStorage.getItem('lh_orders')
-      if (storedUser) {
-        setUser(JSON.parse(storedUser))
-      }
       if (storedFavs) {
         setFavorites(JSON.parse(storedFavs))
       }
       if (storedOrders) {
         setOrders(JSON.parse(storedOrders))
       }
+      // User comes from Supabase auth only - see auth useEffect below
     } catch {
       // ignore
+    }
+  }, [])
+
+  useEffect(() => {
+    const syncFromSession = (session) => {
+      const authUser = session?.user ?? null
+      if (authUser) {
+        const meta = authUser.user_metadata || {}
+        const name = meta.full_name ?? meta.name ?? (meta.given_name && meta.family_name ? `${meta.given_name} ${meta.family_name}`.trim() : meta.given_name ?? meta.family_name) ?? authUser.email?.split('@')[0] ?? ''
+        const nextUser = {
+          name,
+          email: authUser.email ?? '',
+          avatar: meta.picture ?? meta.avatar_url ?? null,
+        }
+        setUser(nextUser)
+        try {
+          window.localStorage.setItem('lh_user', JSON.stringify(nextUser))
+        } catch {
+          // ignore
+        }
+      } else {
+        setUser(null)
+        try {
+          window.localStorage.removeItem('lh_user')
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    const syncUserAndProfile = async () => {
+      const { user: authUser, profile } = await getCurrentUserAndProfile()
+      if (authUser) {
+        const meta = authUser.user_metadata || {}
+        const name = profile?.display_name ?? meta.full_name ?? meta.name ?? (meta.given_name && meta.family_name ? `${meta.given_name} ${meta.family_name}`.trim() : meta.given_name ?? meta.family_name) ?? authUser.email?.split('@')[0] ?? ''
+        const nextUser = {
+          name,
+          email: authUser.email ?? '',
+          avatar: meta.picture ?? meta.avatar_url ?? null,
+        }
+        setUser(nextUser)
+        try {
+          window.localStorage.setItem('lh_user', JSON.stringify(nextUser))
+        } catch {
+          // ignore
+        }
+      } else {
+        setUser(null)
+        try {
+          window.localStorage.removeItem('lh_user')
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    syncUserAndProfile()
+
+    // Retry after OAuth redirect - Supabase may need time to process the URL
+    const retries = [500, 1000, 2000, 3000].map((ms) => setTimeout(syncUserAndProfile, ms))
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        syncFromSession(session)
+      } else {
+        syncUserAndProfile()
+      }
+    })
+
+    return () => {
+      retries.forEach(clearTimeout)
+      subscription?.unsubscribe()
     }
   }, [])
 
@@ -258,6 +329,28 @@ function App() {
       // ignore
     }
   }, [favorites])
+
+  useEffect(() => {
+    if (currentPage === 'account' && !user) {
+      getCurrentUserAndProfile().then(({ user: authUser, profile }) => {
+        if (authUser) {
+          const meta = authUser.user_metadata || {}
+          const name = profile?.display_name ?? meta.full_name ?? meta.name ?? (meta.given_name && meta.family_name ? `${meta.given_name} ${meta.family_name}`.trim() : meta.given_name ?? meta.family_name) ?? authUser.email?.split('@')[0] ?? ''
+          const nextUser = {
+            name,
+            email: authUser.email ?? '',
+            avatar: meta.picture ?? meta.avatar_url ?? null,
+          }
+          setUser(nextUser)
+          try {
+            window.localStorage.setItem('lh_user', JSON.stringify(nextUser))
+          } catch {
+            // ignore
+          }
+        }
+      })
+    }
+  }, [currentPage, user])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -423,71 +516,82 @@ function App() {
     navigateTo('preorder')
   }
 
-  const handleLogin = async (event) => {
+  const handleSignIn = async (event) => {
+    event.preventDefault()
+    const formData = new FormData(event.currentTarget)
+    const email = formData.get('email')?.toString().trim() ?? ''
+    const password = formData.get('password')?.toString().trim() ?? ''
+    if (!email || !password) return
+
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.error('Sign in error', error)
+      return
+    }
+    if (data?.user) {
+      const { user: authUser, profile } = await getCurrentUserAndProfile()
+      if (authUser) {
+        const meta = authUser.user_metadata || {}
+        const name = profile?.display_name ?? meta.full_name ?? meta.name ?? authUser.email?.split('@')[0] ?? ''
+        const nextUser = { name, email: authUser.email ?? '', avatar: meta.picture ?? meta.avatar_url ?? null }
+        setUser(nextUser)
+        try {
+          window.localStorage.setItem('lh_user', JSON.stringify(nextUser))
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }
+
+  const handleSignUp = async (event) => {
     event.preventDefault()
     const formData = new FormData(event.currentTarget)
     const name = formData.get('name')?.toString().trim() ?? ''
     const email = formData.get('email')?.toString().trim() ?? ''
     const password = formData.get('password')?.toString().trim() ?? ''
     const phone = formData.get('phone')?.toString().trim() ?? ''
-    const city = formData.get('city')?.toString().trim() ?? ''
     if (!email || !password) return
 
-    let userId
-
-    // Try to sign in first; if user doesn't exist, fall back to sign up
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: { data: { full_name: name } },
     })
-
-    if (signInError && signInError.message?.toLowerCase().includes('invalid login credentials')) {
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-      })
-      if (signUpError) {
-        // eslint-disable-next-line no-console
-        console.error('Supabase signUp error', signUpError)
-        return
-      }
-      userId = signUpData.user?.id
-    } else if (signInError) {
+    if (error) {
       // eslint-disable-next-line no-console
-      console.error('Supabase signIn error', signInError)
+      console.error('Sign up error', error)
       return
-    } else {
-      userId = signInData.user?.id
     }
-
-    if (userId) {
+    if (data?.user) {
       const { error: profileError } = await supabase.from('profiles').upsert(
-        {
-          id: userId,
-          email,
-          full_name: name,
-          phone,
-          city,
-          default_loaf_size: 'full',
-          default_flour: 'white',
-        },
+        { id: data.user.id, display_name: name || email?.split('@')[0], phone: phone || null },
         { onConflict: 'id' },
       )
       if (profileError) {
         // eslint-disable-next-line no-console
-        console.error('Supabase profile upsert error', profileError)
+        console.error('Profile upsert error', profileError)
+      }
+      if (data.session) {
+        const nextUser = { name: name || email?.split('@')[0], email, avatar: null }
+        setUser(nextUser)
+        try {
+          window.localStorage.setItem('lh_user', JSON.stringify(nextUser))
+        } catch {
+          // ignore
+        }
       }
     }
+  }
 
-    const nextUser = { name, email }
-    setUser(nextUser)
-    if (typeof window !== 'undefined') {
-      try {
-        window.localStorage.setItem('lh_user', JSON.stringify(nextUser))
-      } catch {
-        // ignore
-      }
-    }
+  const signInGoogle = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: typeof window !== 'undefined' ? window.location.origin + window.location.pathname : undefined,
+      },
+    })
   }
 
   const navigateTo = (page) => {
@@ -1616,52 +1720,106 @@ function App() {
                   {user ? 'Account details' : 'Sign in to your account'}
                 </div>
                 {user ? (
-                  <p className="account-meta">
-                    Signed in as <strong>{user.email}</strong>
-                    {user.name ? ` (${user.name})` : ''}
-                  </p>
+                  <div className="account-details">
+                    {user.avatar && (
+                      <img src={user.avatar} alt="" className="account-avatar" />
+                    )}
+                    <div className="account-details-fields">
+                      {user.name && (
+                        <p className="account-detail-row">
+                          <span className="account-detail-label">Name</span>
+                          <span className="account-detail-value">{user.name}</span>
+                        </p>
+                      )}
+                      <p className="account-detail-row">
+                        <span className="account-detail-label">Email</span>
+                        <span className="account-detail-value">{user.email}</span>
+                      </p>
+                    </div>
+                  </div>
                 ) : (
                   <p className="account-meta">
-                    We keep it simple: sign in with your name and email so your
-                    pre-orders stay with you.
+                    {accountMode === 'signup'
+                      ? 'Create an account to save favorites and pre-orders.'
+                      : 'Sign in to access your account and favorites.'}
                   </p>
                 )}
                 {!user && (
-                  <form className="account-form" onSubmit={handleLogin}>
-                    <label>
-                      Full name
-                      <input name="name" type="text" autoComplete="name" required />
-                    </label>
-                    <label>
-                      Email
-                      <input
-                        name="email"
-                        type="email"
-                        autoComplete="email"
-                        required
-                      />
-                    </label>
-                    <label>
-                      Password
-                      <input
-                        name="password"
-                        type="password"
-                        autoComplete="new-password"
-                        required
-                      />
-                    </label>
-                    <label>
-                      Phone (optional)
-                      <input name="phone" type="tel" autoComplete="tel" />
-                    </label>
-                    <label>
-                      City (optional)
-                      <input name="city" type="text" autoComplete="address-level2" />
-                    </label>
-                    <button type="submit" className="btn-small">
-                      Create or sign in
-                    </button>
-                  </form>
+                  <>
+                    <div className="account-mode-toggle">
+                      <button
+                        type="button"
+                        className={`account-mode-btn ${accountMode === 'signup' ? 'is-active' : ''}`}
+                        onClick={() => setAccountMode('signup')}
+                      >
+                        Sign up
+                      </button>
+                      <button
+                        type="button"
+                        className={`account-mode-btn ${accountMode === 'signin' ? 'is-active' : ''}`}
+                        onClick={() => setAccountMode('signin')}
+                      >
+                        Sign in
+                      </button>
+                    </div>
+                    {accountMode === 'signup' ? (
+                      <form className="account-form" onSubmit={handleSignUp}>
+                        <label>
+                          Full name
+                          <input name="name" type="text" autoComplete="name" required />
+                        </label>
+                        <label>
+                          Email
+                          <input name="email" type="email" autoComplete="email" required />
+                        </label>
+                        <label>
+                          Password
+                          <input name="password" type="password" autoComplete="new-password" required />
+                        </label>
+                        <label>
+                          Phone (optional)
+                          <input name="phone" type="tel" autoComplete="tel" />
+                        </label>
+                        <button type="submit" className="btn-small">
+                          Sign up
+                        </button>
+                        <p className="account-mode-switch">
+                          Already have an account?{' '}
+                          <button type="button" className="account-mode-link" onClick={() => setAccountMode('signin')}>
+                            Sign in
+                          </button>
+                        </p>
+                        <div className="account-form-divider">or</div>
+                        <button type="button" className="btn-small btn-secondary" onClick={signInGoogle}>
+                          Sign up with Google
+                        </button>
+                      </form>
+                    ) : (
+                      <form className="account-form" onSubmit={handleSignIn}>
+                        <label>
+                          Email
+                          <input name="email" type="email" autoComplete="email" required />
+                        </label>
+                        <label>
+                          Password
+                          <input name="password" type="password" autoComplete="current-password" required />
+                        </label>
+                        <button type="submit" className="btn-small">
+                          Sign in
+                        </button>
+                        <p className="account-mode-switch">
+                          Don&apos;t have an account?{' '}
+                          <button type="button" className="account-mode-link" onClick={() => setAccountMode('signup')}>
+                            Sign up
+                          </button>
+                        </p>
+                        <div className="account-form-divider">or</div>
+                        <button type="button" className="btn-small btn-secondary" onClick={signInGoogle}>
+                          Sign in with Google
+                        </button>
+                      </form>
+                    )}
+                  </>
                 )}
                 {user && (
                   <p className="account-summary">
@@ -1706,11 +1864,10 @@ function App() {
                   </div>
 
                   <div>
-                    <p className="account-meta">Past pre-orders</p>
+                    <p className="account-meta"></p>
                     {orders.length === 0 ? (
                       <p className="account-summary">
-                        Once you place a pre-order, it will appear here as a
-                        simple history on this device.
+                        You haven't placed any orders yet.
                       </p>
                     ) : (
                       <div className="orders-list">
