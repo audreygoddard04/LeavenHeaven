@@ -1,8 +1,4 @@
 {
-  "buildCommand": "npm run build --prefix my-app",
-  "outputDirectory": "my-app/dist",
-  "installCommand": "npm install --prefix my-app",
-  "framework": null,
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
