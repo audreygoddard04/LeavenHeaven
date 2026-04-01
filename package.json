@@ -1,0 +1,11 @@
+{
+  "name": "leavenheaven",
+  "private": true,
+  "scripts": {
+    "install:app": "cd my-app && npm install",
+    "dev": "cd my-app && npm run dev",
+    "build": "cd my-app && npm run build",
+    "preview": "cd my-app && npm run preview",
+    "lint": "cd my-app && npm run lint"
+  }
+}

@@ -1658,6 +1658,16 @@ function App() {
                         <span className="account-detail-value">{user.email}</span>
                       </p>
                     </div>
+                    <button
+                      type="button"
+                      className="btn-small btn-secondary"
+                      style={{ marginTop: '1rem' }}
+                      onClick={async () => {
+                        await supabase.auth.signOut()
+                      }}
+                    >
+                      Sign out
+                    </button>
                   </div>
                 ) : (
                   <p className="account-meta">
