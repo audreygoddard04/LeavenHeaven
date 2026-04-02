@@ -505,7 +505,7 @@ function App() {
 
     if (data?.user) {
       await supabase.from('profiles').upsert(
-        { id: data.user.id, display_name: name || email?.split('@')[0], phone: phone || null },
+        { id: data.user.id, display_name: name || email?.split('@')[0] },
         { onConflict: 'id' },
       )
       setAuthMessage('Check your email to confirm your account, then sign in.')
@@ -531,12 +531,21 @@ function App() {
     }
   }
 
+  // Navigate to account after OAuth redirect or ?next=account
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get('next') === 'account') {
       setCurrentPage('account')
     }
   }, [])
+
+  // When user signs in, go to account page
+  useEffect(() => {
+    if (authUser) {
+      setCurrentPage('account')
+      if (typeof window !== 'undefined') window.location.hash = 'account'
+    }
+  }, [authUser])
 
   useEffect(() => {
     const onHashChange = () => {
