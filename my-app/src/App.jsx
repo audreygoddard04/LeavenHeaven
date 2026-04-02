@@ -766,20 +766,24 @@ function App() {
                         </button>
                       </div>
                       <div className="preorder-product-body">
-                        {product.soldOut ? (
-                          <div className="loaf-sold-out">Sold out</div>
-                        ) : (
-                          <div className="preorder-actions">
-                            <div className="add-btn-with-price">
-                              <button type="button" className="btn-small btn-add" onClick={() => addToCart(product.id, 'loaf')}>Add Loaf</button>
-                              <div className="add-btn-price">${getLoafPriceForProduct(product)}</div>
+                        {(() => {
+                          const isOutOfSeason = product.seasonal && product.season !== currentSeason
+                          if (product.soldOut || isOutOfSeason) {
+                            return <div className="loaf-sold-out">{product.soldOut ? 'Sold out' : 'Out of season'}</div>
+                          }
+                          return (
+                            <div className="preorder-actions">
+                              <div className="add-btn-with-price">
+                                <button type="button" className="btn-small btn-add" onClick={() => addToCart(product.id, 'loaf')}>Add Loaf</button>
+                                <div className="add-btn-price">${getLoafPriceForProduct(product)}</div>
+                              </div>
+                              <div className="add-btn-with-price">
+                                <button type="button" className="btn-small btn-secondary btn-add" onClick={() => addToCart(product.id, 'mini')}>Add Mini</button>
+                                <div className="add-btn-price">${MINI_LOAF_PRICE}</div>
+                              </div>
                             </div>
-                            <div className="add-btn-with-price">
-                              <button type="button" className="btn-small btn-secondary btn-add" onClick={() => addToCart(product.id, 'mini')}>Add Mini</button>
-                              <div className="add-btn-price">${MINI_LOAF_PRICE}</div>
-                            </div>
-                          </div>
-                        )}
+                          )
+                        })()}
                       </div>
                     </div>
                   )

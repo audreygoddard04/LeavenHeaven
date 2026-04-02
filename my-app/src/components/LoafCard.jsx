@@ -28,7 +28,7 @@ function QtyOrAdd({ item, onUpdate, onAdd, price, label, secondary, disabled }) 
   )
 }
 
-export function LoafCard({ product, isFavorite, loafCartItem, miniCartItem, onToggleFavorite, onUpdateQuantity, onAddToCart, showBanner, isOutOfSeason }) {
+export function LoafCard({ product, isFavorite, loafCartItem, miniCartItem, onToggleFavorite, onUpdateQuantity, onAddToCart, showBanner, isOutOfSeason = false }) {
   const classes = ['loaf-card']
   if (showBanner) classes.push('loaf-card--has-banner')
   if (isOutOfSeason) classes.push('loaf-card--out-of-season')
@@ -60,8 +60,10 @@ export function LoafCard({ product, isFavorite, loafCartItem, miniCartItem, onTo
         {product.description}{product.inclusion ? ` It includes ${product.inclusion}.` : ''}
       </p>
       <div className="loaf-actions">
-        {product.soldOut && !loafCartItem && !miniCartItem ? (
-          <div className="loaf-sold-out">Sold out</div>
+        {(product.soldOut || isOutOfSeason) && !loafCartItem && !miniCartItem ? (
+          <div className="loaf-sold-out">
+            {product.soldOut ? 'Sold out' : 'Out of season'}
+          </div>
         ) : (
           <>
             <QtyOrAdd
@@ -70,7 +72,7 @@ export function LoafCard({ product, isFavorite, loafCartItem, miniCartItem, onTo
               onAdd={() => onAddToCart(product.id, 'loaf')}
               price={getLoafPriceForProduct(product)}
               label="Add Loaf"
-              disabled={product.soldOut}
+              disabled={product.soldOut || isOutOfSeason}
             />
             <QtyOrAdd
               item={miniCartItem}
@@ -79,7 +81,7 @@ export function LoafCard({ product, isFavorite, loafCartItem, miniCartItem, onTo
               price={MINI_LOAF_PRICE}
               label="Add Mini"
               secondary
-              disabled={product.soldOut}
+              disabled={product.soldOut || isOutOfSeason}
             />
           </>
         )}
