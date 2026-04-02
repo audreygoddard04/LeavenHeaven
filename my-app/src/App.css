@@ -2517,6 +2517,104 @@ section {
   color: #fdfaf7;
 }
 
+/* ── Pickup window selector ── */
+.cart-pickup-wrap {
+  margin: 14px 0 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cart-pickup-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.cart-pickup-options {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cart-pickup-btn {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-soft);
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.cart-pickup-btn:hover {
+  border-color: #214535;
+}
+
+.cart-pickup-btn--active {
+  border-color: #214535;
+  background: #214535;
+  color: #fdfaf7;
+}
+
+.cart-pickup-closed {
+  font-size: 11px;
+  color: var(--muted);
+  font-style: italic;
+  margin: 0;
+}
+
+/* ── Countdown pill ── */
+.preorder-cutoff-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.preorder-cutoff-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.preorder-cutoff-timer {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #214535;
+  letter-spacing: 0.02em;
+}
+
+/* ── Cart order error ── */
+.cart-order-error {
+  font-size: 11px;
+  color: #c0392b;
+  margin: 0 0 6px;
+}
+
+/* ── Account page pickup date ── */
+.order-row-pickup {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 2px 0 2px;
+}
+
+/* ── Admin page pickup date ── */
+.admin-order-pickup {
+  font-size: 11px;
+  font-weight: 600;
+  color: #214535;
+}
+
 .cart-sample-hint {
   font-size: 11px;
   color: var(--muted);

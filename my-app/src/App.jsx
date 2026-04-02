@@ -19,6 +19,52 @@ import {
   getCurrentSeason,
 } from './data/products'
 
+// ── Pickup-window utilities ──────────────────────────────────────────────────
+
+// Returns up to `count` upcoming Sunday pickup windows that are still open.
+// A Sunday's orders close at the end of the Thursday before it (11:59:59 PM).
+function getPickupWindows(count = 3) {
+  const now = new Date()
+  const windows = []
+  const d = new Date(now)
+  d.setHours(0, 0, 0, 0)
+  // Advance to the next Sunday (never today even if today is Sunday)
+  const daysUntilSun = (7 - d.getDay()) % 7 || 7
+  d.setDate(d.getDate() + daysUntilSun)
+  let attempts = 0
+  while (windows.length < count && attempts < 12) {
+    attempts++
+    const cutoff = new Date(d)
+    cutoff.setDate(cutoff.getDate() - 3) // Thursday before that Sunday
+    cutoff.setHours(23, 59, 59, 999)
+    if (now <= cutoff) {
+      windows.push({ date: new Date(d), cutoff, iso: d.toISOString().split('T')[0] })
+    }
+    d.setDate(d.getDate() + 7)
+  }
+  return windows
+}
+
+function formatPickupLabel(date) {
+  return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+}
+
+// Returns the cutoff Date for the nearest open Sunday (Thursday 11:59:59 PM).
+function getNextCutoff() {
+  const ws = getPickupWindows(1)
+  return ws.length > 0 ? ws[0].cutoff : null
+}
+
+function formatCountdown(ms) {
+  if (ms <= 0) return null
+  const h = Math.floor(ms / 3600000)
+  const m = Math.floor((ms % 3600000) / 60000)
+  const s = Math.floor((ms % 60000) / 1000)
+  return `${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`
+}
+
+// ── End pickup-window utilities ──────────────────────────────────────────────
+
 function getUserDisplay(authUser) {
   if (!authUser) return null
   const meta = authUser.user_metadata || {}
@@ -51,6 +97,22 @@ function App() {
   const [authError, setAuthError] = useState('')
   const [authMessage, setAuthMessage] = useState('')
   const [authLoaderActive, setAuthLoaderActive] = useState(false)
+  const [orderError, setOrderError] = useState(null)
+
+  // Pickup window selection — initialise to the first open Sunday
+  const pickupWindows = getPickupWindows(3)
+  const [pickupDate, setPickupDate] = useState(() => getPickupWindows(1)[0]?.date ?? null)
+
+  // Live countdown to the nearest Thursday cutoff
+  const [countdown, setCountdown] = useState(() => formatCountdown(getNextCutoff() - Date.now()))
+  useEffect(() => {
+    const cutoff = getNextCutoff()
+    if (!cutoff) return
+    const tick = () => setCountdown(formatCountdown(cutoff - Date.now()))
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [])
 
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
   const favKey = authUser ? `lh_favorites_${authUser.id}` : null
@@ -81,6 +143,7 @@ function App() {
             items: row.items,
             includeSample: row.include_sample,
             status: row.status,
+            pickupDate: row.pickup_date ?? null,
           })))
         })
     } else {
@@ -161,8 +224,12 @@ function App() {
       setAuthMessage('Please sign in to place a pre-order.')
       return
     }
-    const createdAt = new Date().toISOString()
-    const orderId = `order-${Date.now()}`
+    if (!pickupDate) {
+      setOrderError('Please select a pickup date.')
+      return
+    }
+    setOrderError(null)
+
     const totalCents = cartItems.reduce((sum, item) => {
       if (item.productId === 'custom') return sum + (item.custom?.unitPrice ?? 0) * item.quantity * 100
       const product = loafProducts.find(p => p.id === item.productId)
@@ -170,18 +237,33 @@ function App() {
       return sum + unitPrice * item.quantity * 100
     }, 0)
 
-    const { error } = await supabase.from('orders').insert({
-      id: orderId,
-      user_id: authUser.id,
-      created_at: createdAt,
-      items: cartItems,
-      include_sample: includeSample,
-      status: 'pending',
-      total_cents: totalCents,
-    })
-    if (error) console.error('Failed to save order:', error.message)
+    const { data: newOrder, error } = await supabase
+      .from('orders')
+      .insert({
+        user_id: authUser.id,
+        items: cartItems,
+        include_sample: includeSample,
+        status: 'pending',
+        total_cents: totalCents,
+        pickup_date: pickupDate.toISOString().split('T')[0],
+      })
+      .select()
+      .single()
 
-    setOrders((prev) => [{ id: orderId, createdAt, items: cartItems, includeSample, status: 'pending' }, ...prev])
+    if (error) {
+      console.error('Failed to save order:', error.message)
+      setOrderError('Something went wrong placing your order. Please try again.')
+      return
+    }
+
+    setOrders((prev) => [{
+      id: newOrder.id,
+      createdAt: newOrder.created_at,
+      items: cartItems,
+      includeSample,
+      status: 'pending',
+      pickupDate: newOrder.pickup_date,
+    }, ...prev])
     clearCart()
   }
 
@@ -469,6 +551,12 @@ function App() {
                 <div className="section-label">Pre-order online</div>
                 <div className="section-title">Build your loaf order &amp; save favorites.</div>
               </div>
+              {countdown && (
+                <div className="preorder-cutoff-pill">
+                  <span className="preorder-cutoff-label">Order cutoff</span>
+                  <span className="preorder-cutoff-timer">{countdown}</span>
+                </div>
+              )}
             </div>
             <div className="preorder-store-grid">
               <aside className="cart-summary">
@@ -519,6 +607,27 @@ function App() {
                     })}
                   </ul>
                 )}
+                {/* Pickup window */}
+                <div className="cart-pickup-wrap">
+                  <div className="cart-pickup-label">Pickup Sunday</div>
+                  {pickupWindows.length === 0 ? (
+                    <p className="cart-pickup-closed">No open pickup windows right now — check back soon.</p>
+                  ) : (
+                    <div className="cart-pickup-options">
+                      {pickupWindows.map((w) => (
+                        <button
+                          key={w.iso}
+                          type="button"
+                          className={`cart-pickup-btn${pickupDate && pickupDate.toISOString().split('T')[0] === w.iso ? ' cart-pickup-btn--active' : ''}`}
+                          onClick={() => setPickupDate(w.date)}
+                        >
+                          {formatPickupLabel(w.date)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <div className="cart-sample-wrap">
                   {!includeSample && (
                     <p className="cart-sample-hint">Add items to your order and get a free sample on us!</p>
@@ -539,7 +648,8 @@ function App() {
                       <button type="button" className="account-mode-link" onClick={() => navigateTo('account')}>Sign in</button>{' '}to place your pre-order.
                     </p>
                   )}
-                  <button type="button" className="btn-small" onClick={placePreorder} disabled={cartItems.length === 0}>
+                  {orderError && <p className="cart-order-error">{orderError}</p>}
+                  <button type="button" className="btn-small" onClick={placePreorder} disabled={cartItems.length === 0 || !pickupDate}>
                     Place pre-order
                   </button>
                 </div>
@@ -877,12 +987,18 @@ function App() {
                             return `${item.quantity}× ${label}${item.size === 'mini' ? ' (mini)' : ''}`
                           }).join(', ')
                           const statusLabel = { pending: 'Pending', confirmed: 'Confirmed', ready: 'Ready for pickup', completed: 'Completed' }[order.status] ?? order.status
+                          const pickupLabel = order.pickupDate
+                            ? new Date(order.pickupDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+                            : null
                           return (
                             <div key={order.id} className="orders-list-item">
                               <div className="order-row-top">
                                 <strong>{date}</strong>
                                 <span className={`order-status order-status--${order.status ?? 'pending'}`}>{statusLabel}</span>
                               </div>
+                              {pickupLabel && (
+                                <div className="order-row-pickup">Pickup: {pickupLabel}</div>
+                              )}
                               <div className="order-row-items">{itemSummary}</div>
                               {order.includeSample && <div className="order-row-note">+ Free sampler slice</div>}
                             </div>

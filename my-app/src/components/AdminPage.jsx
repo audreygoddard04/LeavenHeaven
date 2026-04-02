@@ -28,6 +28,13 @@ function formatTime(iso) {
   return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 }
 
+function formatPickupDate(dateStr) {
+  if (!dateStr) return null
+  return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', {
+    weekday: 'long', month: 'short', day: 'numeric',
+  })
+}
+
 function itemSummary(items) {
   return items.map((item) => {
     if (item.productId === 'custom') {
@@ -104,7 +111,10 @@ export function AdminPage({ orders, profiles, onUpdateStatus, onRefresh }) {
                   <div className="admin-order-header">
                     <div className="admin-order-meta">
                       <span className="admin-order-customer">{profiles[order.user_id] ?? 'Customer'}</span>
-                      <span className="admin-order-date">{formatDate(order.created_at)} at {formatTime(order.created_at)}</span>
+                      <span className="admin-order-date">Ordered {formatDate(order.created_at)} at {formatTime(order.created_at)}</span>
+                      {order.pickup_date && (
+                        <span className="admin-order-pickup">Pickup: {formatPickupDate(order.pickup_date)}</span>
+                      )}
                     </div>
                     <div className="admin-order-right">
                       {order.total_cents > 0 && (
@@ -152,6 +162,9 @@ export function AdminPage({ orders, profiles, onUpdateStatus, onRefresh }) {
                   <div className="admin-order-meta">
                     <span className="admin-order-customer">{profiles[order.user_id] ?? 'Customer'}</span>
                     <span className="admin-order-date">{formatDate(order.created_at)}</span>
+                    {order.pickup_date && (
+                      <span className="admin-order-pickup">Pickup: {formatPickupDate(order.pickup_date)}</span>
+                    )}
                   </div>
                   {order.total_cents > 0 && (
                     <span className="admin-order-total">${(order.total_cents / 100).toFixed(2)}</span>
