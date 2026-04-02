@@ -850,39 +850,6 @@ function App() {
 
             <div className="section-heading section-heading--seasonal">
               <div>
-                <div className="section-label">Seasonal</div>
-                <div className="section-title">Limited edition flavors.</div>
-              </div>
-            </div>
-
-            {[currentSeason, ...SEASON_ORDER.filter((s) => s !== currentSeason)].map((seasonKey) => {
-              const seasonLoaves = loafProducts.filter((p) => p.seasonal && p.season === seasonKey)
-              if (seasonLoaves.length === 0) return null
-              return (
-                <div key={seasonKey} className="seasonal-group">
-                  <h3 className="seasonal-group-title">{SEASON_LABELS[seasonKey]}</h3>
-                  <div className="loaves-grid">
-                    {seasonLoaves.map((product) => (
-                      <LoafCard
-                        key={product.id}
-                        product={product}
-                        isFavorite={favorites.includes(product.id)}
-                        loafCartItem={cartItems.find((i) => i.productId === product.id && i.size === 'loaf')}
-                        miniCartItem={cartItems.find((i) => i.productId === product.id && i.size === 'mini')}
-                        onToggleFavorite={toggleFavorite}
-                        onUpdateQuantity={updateCartItemQuantity}
-                        onAddToCart={addToCart}
-                        showBanner
-                        isOutOfSeason={product.season !== currentSeason}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )
-            })}
-
-            <div className="section-heading section-heading--seasonal">
-              <div>
                 <div className="section-label">High protein</div>
                 <h2 className="section-title protein-loaves-title">Protein Loaves</h2>
                 <div className="section-caption">Savory, sweet, and advanced high-protein options.</div>
@@ -910,6 +877,39 @@ function App() {
                         onToggleFavorite={toggleFavorite}
                         onUpdateQuantity={updateCartItemQuantity}
                         onAddToCart={addToCart}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+
+            <div className="section-heading section-heading--seasonal">
+              <div>
+                <div className="section-label">Seasonal</div>
+                <div className="section-title">Limited edition flavors.</div>
+              </div>
+            </div>
+
+            {[currentSeason, ...SEASON_ORDER.filter((s) => s !== currentSeason)].map((seasonKey) => {
+              const seasonLoaves = loafProducts.filter((p) => p.seasonal && p.season === seasonKey)
+              if (seasonLoaves.length === 0) return null
+              return (
+                <div key={seasonKey} className="seasonal-group">
+                  <h3 className="seasonal-group-title">{SEASON_LABELS[seasonKey]}</h3>
+                  <div className="loaves-grid">
+                    {seasonLoaves.map((product) => (
+                      <LoafCard
+                        key={product.id}
+                        product={product}
+                        isFavorite={favorites.includes(product.id)}
+                        loafCartItem={cartItems.find((i) => i.productId === product.id && i.size === 'loaf')}
+                        miniCartItem={cartItems.find((i) => i.productId === product.id && i.size === 'mini')}
+                        onToggleFavorite={toggleFavorite}
+                        onUpdateQuantity={updateCartItemQuantity}
+                        onAddToCart={addToCart}
+                        showBanner
+                        isOutOfSeason={product.season !== currentSeason}
                       />
                     ))}
                   </div>
