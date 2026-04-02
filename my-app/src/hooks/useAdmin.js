@@ -1,6 +1,17 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
 
+// Returns the local timestamp of the most recent Friday at 8:00 AM —
+// used as a week ID that advances every Friday morning.
+function getLotwWeekId() {
+  const now = new Date()
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 8, 0, 0)
+  const daysToLastFriday = (d.getDay() - 5 + 7) % 7
+  d.setDate(d.getDate() - daysToLastFriday)
+  if (d > now) d.setDate(d.getDate() - 7)
+  return d.getTime()
+}
+
 export function useAdmin(authUser) {
   const [isAdmin, setIsAdmin] = useState(false)
   const [orders, setOrders] = useState([])
@@ -56,7 +67,14 @@ export function useAdmin(authUser) {
       .select('value')
       .eq('key', 'loaf_of_the_week')
       .single()
-    setLotwProductId(data?.value ?? null)
+    if (!data?.value) { setLotwProductId(null); return }
+    try {
+      const parsed = JSON.parse(data.value)
+      // Expired if it was set in a previous LOTW week
+      setLotwProductId(parsed.since === getLotwWeekId() ? parsed.id : null)
+    } catch {
+      setLotwProductId(data.value) // legacy plain-string fallback
+    }
   }, [])
 
   useEffect(() => {
@@ -78,11 +96,19 @@ export function useAdmin(authUser) {
     return { error }
   }
 
-  const updateLotw = async (productId) => {
+  const updateLotw = async (value) => {
+    // `value` is already a JSON string (or null) produced by the caller
     const { error } = await supabase
       .from('site_settings')
-      .upsert({ key: 'loaf_of_the_week', value: productId ?? null })
-    if (!error) setLotwProductId(productId ?? null)
+      .upsert({ key: 'loaf_of_the_week', value: value ?? null })
+    if (!error) {
+      try {
+        const parsed = value ? JSON.parse(value) : null
+        setLotwProductId(parsed?.id ?? null)
+      } catch {
+        setLotwProductId(null)
+      }
+    }
     return { error }
   }
 

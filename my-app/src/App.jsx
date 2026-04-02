@@ -63,6 +63,23 @@ function formatCountdown(ms) {
   return `${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`
 }
 
+// ── Loaf-of-the-week week ID ─────────────────────────────────────────────────
+
+// Returns the local timestamp (ms) of the most recent Friday at 8:00 AM.
+// This value is identical for the whole week, then jumps every Friday at 8am —
+// so it doubles as both the auto-rotation seed and the expiry check.
+function getLotwWeekId() {
+  const now = new Date()
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 8, 0, 0)
+  // getDay(): 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri 6=Sat
+  const daysToLastFriday = (d.getDay() - 5 + 7) % 7
+  d.setDate(d.getDate() - daysToLastFriday)
+  if (d > now) d.setDate(d.getDate() - 7) // haven't hit 8am yet today
+  return d.getTime()
+}
+
+// ── End loaf-of-the-week utilities ───────────────────────────────────────────
+
 // ── End pickup-window utilities ──────────────────────────────────────────────
 
 function getUserDisplay(authUser) {
@@ -209,29 +226,41 @@ function App() {
     window.scrollTo(0, 0)
   }, [])
 
-  // Public fetch of loaf of the week (no auth required)
+  // Public fetch of loaf of the week (no auth required).
+  // Value is stored as JSON: { id, since } where `since` is a getLotwWeekId()
+  // timestamp. If `since` doesn't match the current week the setting is expired.
   useEffect(() => {
     supabase
       .from('site_settings')
       .select('value')
       .eq('key', 'loaf_of_the_week')
       .single()
-      .then(({ data }) => { if (data?.value) setPublicLotwId(data.value) })
+      .then(({ data }) => {
+        if (!data?.value) return
+        try {
+          const parsed = JSON.parse(data.value)
+          if (parsed.since === getLotwWeekId()) setPublicLotwId(parsed.id)
+        } catch {
+          setPublicLotwId(data.value) // legacy plain-string fallback
+        }
+      })
   }, [])
 
-  // Admin update syncs the public display immediately
+  // Admin update — tags the value with the current week ID so it auto-expires next Friday 8am
   const handleUpdateLotw = async (productId) => {
-    await updateLotw(productId)
+    const value = productId ? JSON.stringify({ id: productId, since: getLotwWeekId() }) : null
+    await updateLotw(value)
     setPublicLotwId(productId ?? null)
   }
 
-  // The resolved featured loaf: admin pick → auto-rotation by ISO week
+  // The resolved featured loaf: admin pick → auto-rotation anchored to Friday 8am
   const lotwProduct = (() => {
     const id = isAdmin ? (adminLotwId ?? publicLotwId) : publicLotwId
     if (id) return loafProducts.find((p) => p.id === id) ?? null
-    const weekNum = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000))
+    // Auto-rotate: use Friday-8am week ID as the seed so it changes every Friday
+    const weekIndex = Math.floor(getLotwWeekId() / (7 * 24 * 60 * 60 * 1000))
     const eligible = loafProducts.filter((p) => !p.soldOut && (!p.seasonal || p.season === currentSeason))
-    return eligible.length > 0 ? eligible[weekNum % eligible.length] : null
+    return eligible.length > 0 ? eligible[weekIndex % eligible.length] : null
   })()
 
   const navigateTo = (page) => {
@@ -833,17 +862,14 @@ function App() {
                 <ul className="preorder-list">
                   <li>Classic, rye, savory, or sweet loaves.</li>
                   <li>Full loaf or mini loaves for the week.</li>
-                  <li>Add desserts, coffee beans, or kombucha growlers.</li>
-                  <li>Note macros: high protein, lower sugar, or custom.</li>
                 </ul>
               </div>
               <div className="preorder-card">
-                <div className="preorder-badge">&quot;Loaf of the week&quot;</div>
+                <div className="preorder-badge">Loaf of the week;</div>
                 <div className="preorder-title">A new feature loaf, on repeat.</div>
                 <p className="section-body">One rotating sourdough flavor – like cinnamon raisin, seeded rye, pumpkin spice, or olive &amp; herb – ready on your schedule.</p>
                 <ul className="preorder-list">
                   <li>Pick weekly or bi-weekly pickups.</li>
-                  <li>Add a macro-friendly dessert box if you&apos;d like.</li>
                   <li>Pause easily whenever you&apos;re away.</li>
                 </ul>
               </div>
