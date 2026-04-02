@@ -161,10 +161,19 @@ function App() {
     if (params.get('next') === 'account') setCurrentPage('account')
   }, [])
 
+  // Only redirect to account after an OAuth or email-confirmation callback
+  // (URL will contain access_token= or ?code=). A plain reload should keep
+  // the user on whatever page the hash says.
   useEffect(() => {
-    if (authUser) {
+    if (!authUser) return
+    const hashStr = window.location.hash
+    const searchStr = window.location.search
+    const isAuthCallback =
+      hashStr.includes('access_token=') ||
+      Boolean(new URLSearchParams(searchStr).get('code'))
+    if (isAuthCallback) {
       setCurrentPage('account')
-      if (typeof window !== 'undefined') window.location.hash = 'account'
+      window.location.hash = 'account'
     }
   }, [authUser])
 
@@ -185,10 +194,16 @@ function App() {
       const hash = window.location.hash.slice(1) || 'home'
       if (['home', 'loaves', 'customize', 'preorder', 'favorites', 'account', 'admin'].includes(hash)) {
         setCurrentPage(hash)
+        window.scrollTo(0, 0)
       }
     }
     window.addEventListener('hashchange', onHashChange)
     return () => window.removeEventListener('hashchange', onHashChange)
+  }, [])
+
+  // Scroll to top on initial load (handles page reload mid-scroll)
+  useEffect(() => {
+    window.scrollTo(0, 0)
   }, [])
 
   const navigateTo = (page) => {
