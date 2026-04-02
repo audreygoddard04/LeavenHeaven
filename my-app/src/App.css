@@ -2519,10 +2519,10 @@ section {
 
 /* ── Pickup window selector ── */
 .cart-pickup-wrap {
-  margin: 14px 0 10px;
+  margin: 14px 0 12px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 7px;
 }
 
 .cart-pickup-label {
@@ -2535,31 +2535,52 @@ section {
 
 .cart-pickup-options {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-direction: row;
+  gap: 6px;
 }
 
 .cart-pickup-btn {
+  flex: 1;
   font-family: var(--font-body);
-  font-size: 12px;
-  font-weight: 500;
-  text-align: left;
-  padding: 7px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 10px 6px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border-soft);
   background: #fff;
-  color: var(--text);
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
 }
 
 .cart-pickup-btn:hover {
   border-color: #214535;
 }
 
+.cart-pickup-btn-date {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+}
+
+.cart-pickup-btn-week {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  line-height: 1;
+}
+
 .cart-pickup-btn--active {
   border-color: #214535;
   background: #214535;
+}
+
+.cart-pickup-btn--active .cart-pickup-btn-date,
+.cart-pickup-btn--active .cart-pickup-btn-week {
   color: #fdfaf7;
 }
 

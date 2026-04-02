@@ -168,6 +168,18 @@ function App() {
     }
   }, [authUser])
 
+  // Detect when the user arrives via a password-reset link
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setCurrentPage('account')
+        setAccountMode('reset')
+        if (typeof window !== 'undefined') window.location.hash = 'account'
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
   useEffect(() => {
     const onHashChange = () => {
       const hash = window.location.hash.slice(1) || 'home'
@@ -355,6 +367,50 @@ function App() {
       setAccountMode('signin')
     } else {
       setAuthError('Something went wrong. Please try again.')
+    }
+  }
+
+  const handleForgotPassword = async (event) => {
+    event.preventDefault()
+    resetAuthState()
+    setAuthLoaderActive(true)
+    const formData = new FormData(event.currentTarget)
+    const email = formData.get('email')?.toString().trim() ?? ''
+    if (!email) { setAuthLoaderActive(false); return }
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/?next=account`,
+    })
+    setAuthLoaderActive(false)
+    if (error) {
+      setAuthError(error.message || 'Could not send reset email. Please try again.')
+    } else {
+      setAuthMessage('✓ Check your email — a password reset link is on its way.')
+      setAccountMode('signin')
+    }
+  }
+
+  const handleUpdatePassword = async (event) => {
+    event.preventDefault()
+    resetAuthState()
+    setAuthLoaderActive(true)
+    const formData = new FormData(event.currentTarget)
+    const password = formData.get('password')?.toString().trim() ?? ''
+    const confirm = formData.get('confirm')?.toString().trim() ?? ''
+    if (!password) { setAuthLoaderActive(false); return }
+    if (password !== confirm) {
+      setAuthError('Passwords don\'t match.')
+      setAuthLoaderActive(false)
+      return
+    }
+
+    const { error } = await supabase.auth.updateUser({ password })
+    setAuthLoaderActive(false)
+    if (error) {
+      setAuthError(error.message || 'Could not update password. Please try again.')
+    } else {
+      setAuthMessage('✓ Password updated! You\'re signed in.')
+      setAccountMode('signin')
     }
   }
 
@@ -553,7 +609,7 @@ function App() {
               </div>
               {countdown && (
                 <div className="preorder-cutoff-pill">
-                  <span className="preorder-cutoff-label">Order cutoff</span>
+                  <span className="preorder-cutoff-label">This Sunday's cutoff</span>
                   <span className="preorder-cutoff-timer">{countdown}</span>
                 </div>
               )}
@@ -609,21 +665,27 @@ function App() {
                 )}
                 {/* Pickup window */}
                 <div className="cart-pickup-wrap">
-                  <div className="cart-pickup-label">Pickup Sunday</div>
+                  <div className="cart-pickup-label">Choose Your Pickup Date</div>
                   {pickupWindows.length === 0 ? (
                     <p className="cart-pickup-closed">No open pickup windows right now — check back soon.</p>
                   ) : (
                     <div className="cart-pickup-options">
-                      {pickupWindows.map((w) => (
-                        <button
-                          key={w.iso}
-                          type="button"
-                          className={`cart-pickup-btn${pickupDate && pickupDate.toISOString().split('T')[0] === w.iso ? ' cart-pickup-btn--active' : ''}`}
-                          onClick={() => setPickupDate(w.date)}
-                        >
-                          {formatPickupLabel(w.date)}
-                        </button>
-                      ))}
+                      {pickupWindows.map((w, i) => {
+                        const isActive = pickupDate && pickupDate.toISOString().split('T')[0] === w.iso
+                        const monthDay = w.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                        const weekLabel = i === 0 ? 'This Sunday' : i === 1 ? 'Next Sunday' : '+2 Sundays'
+                        return (
+                          <button
+                            key={w.iso}
+                            type="button"
+                            className={`cart-pickup-btn${isActive ? ' cart-pickup-btn--active' : ''}`}
+                            onClick={() => setPickupDate(w.date)}
+                          >
+                            <span className="cart-pickup-btn-date">{monthDay}</span>
+                            <span className="cart-pickup-btn-week">{weekLabel}</span>
+                          </button>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
@@ -930,15 +992,17 @@ function App() {
                   </div>
                 ) : (
                   <p className="account-meta">
-                    {accountMode === 'signup' ? 'Create an account to save favorites and pre-orders.' : 'Sign in to access your account and favorites.'}
+                    {accountMode === 'signup' ? 'Create an account to save favorites and pre-orders.' : accountMode === 'forgot' ? 'Reset your password.' : accountMode === 'reset' ? 'Set a new password.' : 'Sign in to access your account and favorites.'}
                   </p>
                 )}
                 {!user && (
                   <>
-                    <div className="account-mode-toggle">
-                      <button type="button" className={`account-mode-btn ${accountMode === 'signup' ? 'is-active' : ''}`} onClick={() => { setAccountMode('signup'); resetAuthState() }}>Sign up</button>
-                      <button type="button" className={`account-mode-btn ${accountMode === 'signin' ? 'is-active' : ''}`} onClick={() => { setAccountMode('signin'); resetAuthState() }}>Sign in</button>
-                    </div>
+                    {!['forgot', 'reset'].includes(accountMode) && (
+                      <div className="account-mode-toggle">
+                        <button type="button" className={`account-mode-btn ${accountMode === 'signup' ? 'is-active' : ''}`} onClick={() => { setAccountMode('signup'); resetAuthState() }}>Sign up</button>
+                        <button type="button" className={`account-mode-btn ${accountMode === 'signin' ? 'is-active' : ''}`} onClick={() => { setAccountMode('signin'); resetAuthState() }}>Sign in</button>
+                      </div>
+                    )}
                     {authMessage && <p className="account-auth-message">{authMessage}</p>}
                     {authError && <p className="account-auth-error">{authError}</p>}
                     {accountMode === 'signup' ? (
@@ -952,12 +1016,29 @@ function App() {
                         <div className="account-form-divider">or</div>
                         <button type="button" className="btn-small btn-secondary" onClick={signInGoogle}>Sign up with Google</button>
                       </form>
+                    ) : accountMode === 'forgot' ? (
+                      <form className="account-form" onSubmit={handleForgotPassword}>
+                        <p className="account-meta" style={{ marginTop: 0 }}>Enter your email and we'll send you a link to reset your password.</p>
+                        <label>Email<input name="email" type="email" autoComplete="email" required /></label>
+                        <button type="submit" className="btn-small" disabled={authLoaderActive}>{authLoaderActive ? 'Sending…' : 'Send reset link'}</button>
+                        <p className="account-mode-switch"><button type="button" className="account-mode-link" onClick={() => { setAccountMode('signin'); resetAuthState() }}>Back to sign in</button></p>
+                      </form>
+                    ) : accountMode === 'reset' ? (
+                      <form className="account-form" onSubmit={handleUpdatePassword}>
+                        <p className="account-meta" style={{ marginTop: 0 }}>Choose a new password for your account.</p>
+                        <label>New password<input name="password" type="password" autoComplete="new-password" required minLength={6} /></label>
+                        <label>Confirm password<input name="confirm" type="password" autoComplete="new-password" required minLength={6} /></label>
+                        <button type="submit" className="btn-small" disabled={authLoaderActive}>{authLoaderActive ? 'Updating…' : 'Update password'}</button>
+                      </form>
                     ) : (
                       <form className="account-form" onSubmit={handleSignIn}>
                         <label>Email<input name="email" type="email" autoComplete="email" required /></label>
                         <label>Password<input name="password" type="password" autoComplete="current-password" required /></label>
                         <button type="submit" className="btn-small" disabled={authLoaderActive}>{authLoaderActive ? 'Signing in…' : 'Sign in'}</button>
-                        <p className="account-mode-switch">Don&apos;t have an account?{' '}<button type="button" className="account-mode-link" onClick={() => { setAccountMode('signup'); resetAuthState() }}>Sign up</button></p>
+                        <p className="account-mode-switch">
+                          Don&apos;t have an account?{' '}<button type="button" className="account-mode-link" onClick={() => { setAccountMode('signup'); resetAuthState() }}>Sign up</button>
+                          {' · '}<button type="button" className="account-mode-link" onClick={() => { setAccountMode('forgot'); resetAuthState() }}>Forgot password?</button>
+                        </p>
                         <div className="account-form-divider">or</div>
                         <button type="button" className="btn-small btn-secondary" onClick={signInGoogle}>Sign in with Google</button>
                       </form>
