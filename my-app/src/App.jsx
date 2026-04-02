@@ -5,8 +5,10 @@ import { BuildYourLoaf } from './components/BuildYourLoaf'
 import { LoafCard } from './components/LoafCard'
 import { FavoritesList } from './components/FavoritesList'
 import { NavBar } from './components/NavBar'
+import { AdminPage } from './components/AdminPage'
 import { supabase } from './lib/supabaseClient'
 import { useAuth } from './hooks/useAuth'
+import { useAdmin } from './hooks/useAdmin'
 import {
   loafProducts,
   LOAF_IMAGES,
@@ -30,6 +32,7 @@ function getUserDisplay(authUser) {
 function App() {
   const { user: authUser, loading: authLoading } = useAuth()
   const user = getUserDisplay(authUser) ?? null
+  const { isAdmin, orders: adminOrders, profiles: adminProfiles, loadOrders: refreshAdminOrders, updateOrderStatus } = useAdmin(authUser)
 
   const [cartItems, setCartItems] = useState([])
   const [favorites, setFavorites] = useState([])
@@ -37,7 +40,7 @@ function App() {
   const [currentPage, setCurrentPage] = useState(() => {
     if (typeof window === 'undefined') return 'home'
     const hash = window.location.hash.slice(1) || 'home'
-    return ['home', 'loaves', 'customize', 'preorder', 'favorites', 'account'].includes(hash) ? hash : 'home'
+    return ['home', 'loaves', 'customize', 'preorder', 'favorites', 'account', 'admin'].includes(hash) ? hash : 'home'
   })
   const [navOpen, setNavOpen] = useState(false)
   const [includeSample, setIncludeSample] = useState(false)
@@ -105,7 +108,7 @@ function App() {
   useEffect(() => {
     const onHashChange = () => {
       const hash = window.location.hash.slice(1) || 'home'
-      if (['home', 'loaves', 'customize', 'preorder', 'favorites', 'account'].includes(hash)) {
+      if (['home', 'loaves', 'customize', 'preorder', 'favorites', 'account', 'admin'].includes(hash)) {
         setCurrentPage(hash)
       }
     }
@@ -294,6 +297,7 @@ function App() {
             searchOpen={searchOpen}
             searchQuery={searchQuery}
             navOpen={navOpen}
+            isAdmin={isAdmin}
             onNavigate={navigateTo}
             onToggleNav={() => setNavOpen((o) => !o)}
             onSearchToggle={() => setSearchOpen((o) => !o)}
@@ -882,6 +886,18 @@ function App() {
               </div>
             </div>
           </section>
+
+          {/* Admin */}
+          {isAdmin && (
+            <section id="admin" className={currentPage === 'admin' ? '' : 'is-hidden'}>
+              <AdminPage
+                orders={adminOrders}
+                profiles={adminProfiles}
+                onUpdateStatus={updateOrderStatus}
+                onRefresh={refreshAdminOrders}
+              />
+            </section>
+          )}
         </div>
       </main>
 

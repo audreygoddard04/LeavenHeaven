@@ -35,6 +35,7 @@ export function NavBar({
   searchOpen,
   searchQuery,
   navOpen,
+  isAdmin,
   onNavigate,
   onToggleNav,
   onSearchToggle,
@@ -66,6 +67,7 @@ export function NavBar({
     { page: 'home', label: 'Home' },
     { page: 'loaves', label: 'Loaves' },
     { page: 'customize', label: 'Customize your loaf' },
+    ...(isAdmin ? [{ page: 'admin', label: 'Admin' }] : []),
   ]
 
   return (

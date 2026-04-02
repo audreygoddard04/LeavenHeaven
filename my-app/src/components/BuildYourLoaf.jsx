@@ -36,11 +36,14 @@ function builderReducer(state, action) {
   }
 }
 
-/**
- * Build Your Loaf - main UI.
- * Full + Mini shown side by side; Mini mirrors Full (same flour + inclusions).
- */
-export function BuildYourLoaf() {
+function calcCustomPrice(state) {
+  const base = state.selectedSize === 'mini' ? 6 : 10
+  const inclusions = [...state.sweetInclusions, ...state.savoryInclusions].reduce((sum, inc) => sum + (inc.price ?? 0), 0)
+  const protein = state.proteinEnhancement !== 'none' ? 4 : 0
+  return base + inclusions + protein
+}
+
+export function BuildYourLoaf({ onAddToCart }) {
   const [state, dispatch] = useReducer(builderReducer, initialState)
 
   return (
@@ -110,7 +113,18 @@ export function BuildYourLoaf() {
         <div className="build-your-loaf-form-section">
           <BuilderForm state={state} dispatch={dispatch} />
           <PriceSummary state={state} />
-          <button type="button" className="btn build-your-loaf-add-btn">
+          <button
+            type="button"
+            className="btn build-your-loaf-add-btn"
+            onClick={() => onAddToCart?.({
+              flour: state.flour,
+              sweetInclusions: state.sweetInclusions,
+              savoryInclusions: state.savoryInclusions,
+              proteinEnhancement: state.proteinEnhancement,
+              size: state.selectedSize,
+              unitPrice: calcCustomPrice(state),
+            })}
+          >
             Add to cart
           </button>
         </div>
