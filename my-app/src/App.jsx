@@ -98,6 +98,9 @@ function App() {
   const [authMessage, setAuthMessage] = useState('')
   const [authLoaderActive, setAuthLoaderActive] = useState(false)
   const [orderError, setOrderError] = useState(null)
+  const [publicLotwId, setPublicLotwId] = useState(null)
+
+  const currentSeason = getCurrentSeason()
 
   // Pickup window selection — initialise to the first open Sunday
   const pickupWindows = getPickupWindows(3)
@@ -207,7 +210,6 @@ function App() {
   }, [])
 
   // Public fetch of loaf of the week (no auth required)
-  const [publicLotwId, setPublicLotwId] = useState(null)
   useEffect(() => {
     supabase
       .from('site_settings')
@@ -463,8 +465,6 @@ function App() {
       },
     })
   }
-
-  const currentSeason = getCurrentSeason()
 
   return (
     <>
