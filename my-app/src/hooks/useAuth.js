@@ -19,7 +19,12 @@ export function useAuth() {
   const [session, setSession] = useState(undefined)
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    // Kick off initial session detection (handles tokens in URL hash from confirmation links)
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(prev => prev === undefined ? (data.session ?? null) : prev)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession ?? null)
       if (newSession?.user) ensureProfile(newSession.user)
     })
