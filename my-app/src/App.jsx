@@ -343,7 +343,7 @@ function App() {
 
           <div className="header-offer-bar">
             <button type="button" className="header-offer-bar-btn" onClick={() => navigateTo('preorder')}>
-              Get a free sampler slice when you checkout TODAY!
+              Get a free sampler when you checkout TODAY!
             </button>
           </div>
 
@@ -520,15 +520,18 @@ function App() {
                   </ul>
                 )}
                 <div className="cart-sample-wrap">
+                  {!includeSample && (
+                    <p className="cart-sample-hint">Add items to your order and get a free sample on us!</p>
+                  )}
                   <button
                     type="button"
                     className={`btn-sample${includeSample ? ' btn-sample--active' : ''}`}
                     onClick={() => setIncludeSample((prev) => !prev)}
                     disabled={cartItems.length === 0}
                   >
-                    {includeSample ? 'Free sample added' : 'Add free sample'}
+                    {includeSample ? 'Free sample added ✓' : 'Add free sample'}
                   </button>
-                  {includeSample && <p className="cart-sample-beneath">+ Free sample</p>}
+                  {includeSample && <p className="cart-sample-beneath">+ Free sample loaf included with your order!</p>}
                 </div>
                 <div className="cart-actions">
                   {!authUser && cartItems.length > 0 && (
@@ -767,7 +770,13 @@ function App() {
                     <button type="button" className="auth-prompt-inline-btn" onClick={() => navigateTo('account')}>Sign in / Sign up</button>
                   </div>
                 ) : favorites.length === 0 ? (
-                  <p className="account-summary">Tap the heart icon on any loaf to mark it as a favorite.</p>
+                  <p className="account-summary">
+                    Tap the{' '}
+                    <svg style={{ display: 'inline', verticalAlign: 'middle', marginBottom: '2px' }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                    </svg>
+                    {' '}on any loaf to mark it as a favorite.
+                  </p>
                 ) : (
                   <FavoritesList favorites={favorites} onToggleFavorite={toggleFavorite} />
                 )}

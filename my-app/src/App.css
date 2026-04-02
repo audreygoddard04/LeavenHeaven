@@ -2517,6 +2517,13 @@ section {
   color: #fdfaf7;
 }
 
+.cart-sample-hint {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0 0 4px;
+  font-style: italic;
+}
+
 .cart-sample-beneath {
   font-size: 11px;
   color: var(--muted);
