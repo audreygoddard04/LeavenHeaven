@@ -3197,6 +3197,128 @@ footer {
   width: 100%;
 }
 
+/* ── Favorites image cards ─────────────────────────────── */
+.fav-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.fav-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 96px;
+  background: var(--surface, #faf9f7);
+  border: 1px solid var(--border, #e8e2d9);
+  border-radius: 10px;
+  padding: 10px 8px 8px;
+  transition: box-shadow 0.15s;
+}
+
+.fav-card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.fav-card-img {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 6px;
+  display: block;
+}
+
+.fav-card-img-placeholder {
+  width: 72px;
+  height: 72px;
+  border-radius: 6px;
+  background: var(--border, #e8e2d9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted, #999);
+}
+
+.fav-card-name {
+  font-size: 11px;
+  font-weight: 500;
+  text-align: center;
+  color: var(--text, #2c2c2c);
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.fav-card-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.12);
+  color: #555;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.15s;
+}
+
+.fav-card-remove:hover {
+  background: rgba(180,0,0,0.18);
+  color: #900;
+}
+
+/* ── Order list ─────────────────────────────────────────── */
+.orders-list-item {
+  border: 1px solid var(--border, #e8e2d9);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  background: var(--surface, #faf9f7);
+}
+
+.order-row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.order-row-items {
+  font-size: 13px;
+  color: var(--text-muted, #666);
+  line-height: 1.4;
+}
+
+.order-row-note {
+  font-size: 12px;
+  color: var(--text-muted, #888);
+  margin-top: 2px;
+  font-style: italic;
+}
+
+.order-status {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+.order-status--pending   { background: #fff3cd; color: #856404; }
+.order-status--confirmed { background: #cce5ff; color: #004085; }
+.order-status--ready     { background: #d4edda; color: #155724; }
+.order-status--completed { background: #e2e3e5; color: #383d41; }
+
 .account-auth-error {
   font-size: 13px;
   color: #c0392b;

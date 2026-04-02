@@ -257,10 +257,9 @@ function App() {
   useEffect(() => {
     if (authLoading) return
     if (typeof window === 'undefined') return
-    try {
-      const storedOrders = window.localStorage.getItem('lh_orders')
-      if (storedOrders) setOrders(JSON.parse(storedOrders))
 
+    // Load favorites from localStorage (user-scoped)
+    try {
       if (favKey) {
         const storedFavs = window.localStorage.getItem(favKey)
         setFavorites(storedFavs ? JSON.parse(storedFavs) : [])
@@ -269,6 +268,26 @@ function App() {
       }
     } catch {
       // ignore
+    }
+
+    // Load orders from Supabase if signed in, otherwise clear
+    if (authUser) {
+      supabase
+        .from('orders')
+        .select('*')
+        .eq('user_id', authUser.id)
+        .order('created_at', { ascending: false })
+        .then(({ data }) => {
+          if (data) setOrders(data.map(row => ({
+            id: row.id,
+            createdAt: row.created_at,
+            items: row.items,
+            includeSample: row.include_sample,
+            status: row.status,
+          })))
+        })
+    } else {
+      setOrders([])
     }
   }, [authLoading, authUser?.id, favKey])
 
@@ -281,15 +300,6 @@ function App() {
       // ignore
     }
   }, [favorites, favKey])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    try {
-      window.localStorage.setItem('lh_orders', JSON.stringify(orders))
-    } catch {
-      // ignore
-    }
-  }, [orders])
 
   useEffect(() => {
     if (!searchOpen) return
@@ -400,7 +410,7 @@ function App() {
     })
   }
 
-  const placePreorder = () => {
+  const placePreorder = async () => {
     if (cartItems.length === 0) return
     if (!authUser) {
       navigateTo('account')
@@ -408,13 +418,37 @@ function App() {
       return
     }
     const createdAt = new Date().toISOString()
-    const order = {
-      id: `order-${createdAt}`,
+    const orderId = `order-${Date.now()}`
+    const totalCents = cartItems.reduce((sum, item) => {
+      const product = loafProducts.find(p => p.id === item.productId)
+      const unitPrice = item.isCustom
+        ? (item.size === 'mini' ? MINI_LOAF_PRICE : LOAF_PRICE) * 100
+        : (item.size === 'mini' ? MINI_LOAF_PRICE : getLoafPriceForProduct(product)) * 100
+      return sum + unitPrice * item.quantity
+    }, 0)
+
+    const orderRow = {
+      id: orderId,
+      user_id: authUser.id,
+      created_at: createdAt,
+      items: cartItems,
+      include_sample: includeSample,
+      status: 'pending',
+      total_cents: totalCents,
+    }
+
+    const { error } = await supabase.from('orders').insert(orderRow)
+    if (error) {
+      console.error('Failed to save order:', error.message)
+    }
+
+    setOrders((prev) => [{
+      id: orderId,
       createdAt,
       items: cartItems,
       includeSample,
-    }
-    setOrders((prev) => [order, ...prev])
+      status: 'pending',
+    }, ...prev])
     setCartItems([])
     setIncludeSample(false)
   }
@@ -1662,23 +1696,31 @@ function App() {
                     mark it as a favorite.
                   </p>
                 ) : (
-                  <div className="chip-row">
+                  <div className="fav-cards">
                     {favorites.map((id) => {
                       if (id === 'custom') {
                         return (
-                          <span key={id} className="chip">
-                            Custom loaf
-                          </span>
+                          <div key={id} className="fav-card">
+                            <div className="fav-card-img-placeholder">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+                            </div>
+                            <span className="fav-card-name">Custom loaf</span>
+                            <button className="fav-card-remove" onClick={() => toggleFavorite(id)} aria-label="Remove from favorites">×</button>
+                          </div>
                         )
                       }
-                      const product = loafProducts.find(
-                        (p) => p.id === id,
-                      )
+                      const product = loafProducts.find((p) => p.id === id)
                       if (!product) return null
+                      const img = LOAF_IMAGES[id]
                       return (
-                        <span key={id} className="chip">
-                          {product.name}
-                        </span>
+                        <div key={id} className="fav-card">
+                          {img
+                            ? <img src={img} alt={product.name} className="fav-card-img" />
+                            : <div className="fav-card-img-placeholder" />
+                          }
+                          <span className="fav-card-name">{product.name}</span>
+                          <button className="fav-card-remove" onClick={() => toggleFavorite(id)} aria-label="Remove from favorites">×</button>
+                        </div>
                       )
                     })}
                   </div>
@@ -1844,23 +1886,29 @@ function App() {
                         mark it as a favorite.
                       </p>
                     ) : (
-                      <div className="chip-row">
+                      <div className="fav-cards">
                         {favorites.map((id) => {
                           if (id === 'custom') {
                             return (
-                              <span key={id} className="chip">
-                                Custom loaf
-                              </span>
+                              <div key={id} className="fav-card">
+                                <div className="fav-card-img-placeholder" />
+                                <span className="fav-card-name">Custom loaf</span>
+                                <button className="fav-card-remove" onClick={() => toggleFavorite(id)} aria-label="Remove from favorites">×</button>
+                              </div>
                             )
                           }
-                          const product = loafProducts.find(
-                            (p) => p.id === id,
-                          )
+                          const product = loafProducts.find((p) => p.id === id)
                           if (!product) return null
+                          const img = LOAF_IMAGES[id]
                           return (
-                            <span key={id} className="chip">
-                              {product.name}
-                            </span>
+                            <div key={id} className="fav-card">
+                              {img
+                                ? <img src={img} alt={product.name} className="fav-card-img" />
+                                : <div className="fav-card-img-placeholder" />
+                              }
+                              <span className="fav-card-name">{product.name}</span>
+                              <button className="fav-card-remove" onClick={() => toggleFavorite(id)} aria-label="Remove from favorites">×</button>
+                            </div>
                           )
                         })}
                       </div>
@@ -1876,20 +1924,21 @@ function App() {
                     ) : (
                       <div className="orders-list">
                         {orders.map((order) => {
-                          const date = new Date(
-                            order.createdAt,
-                          ).toLocaleDateString()
-                          const itemCount = order.items.reduce(
-                            (sum, item) => sum + item.quantity,
-                            0,
-                          )
+                          const date = new Date(order.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                          const itemSummary = order.items.map(item => {
+                            const product = loafProducts.find(p => p.id === item.productId)
+                            const label = item.isCustom ? 'Custom loaf' : (product?.name ?? item.productId)
+                            return `${item.quantity}× ${label}${item.size === 'mini' ? ' (mini)' : ''}`
+                          }).join(', ')
+                          const statusLabel = { pending: 'Pending', confirmed: 'Confirmed', ready: 'Ready for pickup', completed: 'Completed' }[order.status] ?? order.status
                           return (
-                            <div
-                              key={order.id}
-                              className="orders-list-item"
-                            >
-                              <strong>{date}</strong> – {itemCount} item
-                              {itemCount > 1 ? 's' : ''}
+                            <div key={order.id} className="orders-list-item">
+                              <div className="order-row-top">
+                                <strong>{date}</strong>
+                                <span className={`order-status order-status--${order.status ?? 'pending'}`}>{statusLabel}</span>
+                              </div>
+                              <div className="order-row-items">{itemSummary}</div>
+                              {order.includeSample && <div className="order-row-note">+ Free sampler slice</div>}
                             </div>
                           )
                         })}
