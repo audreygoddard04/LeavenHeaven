@@ -238,6 +238,7 @@ function App() {
   const [accountMode, setAccountMode] = useState('signup') // 'signin' | 'signup'
   const [authError, setAuthError] = useState('')
   const [authMessage, setAuthMessage] = useState('')
+  const [authLoaderActive, setAuthLoaderActive] = useState(false)
   const searchRef = useRef(null)
 
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
@@ -454,17 +455,22 @@ function App() {
     event.preventDefault()
     setAuthError('')
     setAuthMessage('')
+    setAuthLoaderActive(true)
     const formData = new FormData(event.currentTarget)
     const email = formData.get('email')?.toString().trim() ?? ''
     const password = formData.get('password')?.toString().trim() ?? ''
-    if (!email || !password) return
+    if (!email || !password) { setAuthLoaderActive(false); return }
 
     const { error } = await supabase.auth.signInWithPassword({ email, password })
+    setAuthLoaderActive(false)
     if (error) {
-      if (error.message?.toLowerCase().includes('invalid login')) {
-        setAuthError('Incorrect email or password. Please try again.')
+      const msg = error.message ?? ''
+      if (msg.toLowerCase().includes('invalid login') || msg.toLowerCase().includes('invalid credentials')) {
+        setAuthError('Incorrect email or password. If you signed up with Google, use "Sign in with Google" below.')
+      } else if (msg.toLowerCase().includes('email not confirmed')) {
+        setAuthError('Please confirm your email first — check your inbox for a confirmation link from Supabase.')
       } else {
-        setAuthError(error.message ?? 'Sign in failed. Please try again.')
+        setAuthError(msg || 'Sign in failed. Please try again.')
       }
     }
   }
@@ -473,32 +479,34 @@ function App() {
     event.preventDefault()
     setAuthError('')
     setAuthMessage('')
+    setAuthLoaderActive(true)
     const formData = new FormData(event.currentTarget)
     const name = formData.get('name')?.toString().trim() ?? ''
     const email = formData.get('email')?.toString().trim() ?? ''
     const password = formData.get('password')?.toString().trim() ?? ''
-    const phone = formData.get('phone')?.toString().trim() ?? ''
-    if (!email || !password) return
+    if (!email || !password) { setAuthLoaderActive(false); return }
 
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { full_name: name } },
     })
+    setAuthLoaderActive(false)
 
     if (error) {
-      if (error.message?.toLowerCase().includes('already registered') || error.message?.toLowerCase().includes('already been registered') || error.status === 422) {
-        setAuthError('An account with this email already exists.')
+      const msg = error.message ?? ''
+      if (msg.toLowerCase().includes('already registered') || msg.toLowerCase().includes('already been registered') || error.status === 422) {
+        setAuthError('An account with this email already exists. Please sign in instead.')
         setAccountMode('signin')
       } else {
-        setAuthError(error.message ?? 'Sign up failed. Please try again.')
+        setAuthError(msg || 'Sign up failed. Please try again.')
       }
       return
     }
 
     // Supabase returns a user with empty identities when email is already taken (email confirm enabled)
     if (data?.user && (!data.user.identities || data.user.identities.length === 0)) {
-      setAuthError('An account with this email already exists.')
+      setAuthError('An account with this email already exists. Please sign in instead.')
       setAccountMode('signin')
       return
     }
@@ -508,8 +516,10 @@ function App() {
         { id: data.user.id, display_name: name || email?.split('@')[0] },
         { onConflict: 'id' },
       )
-      setAuthMessage('Check your email to confirm your account, then sign in.')
+      setAuthMessage('✓ Account created! Check your email for a confirmation link, then sign in here.')
       setAccountMode('signin')
+    } else {
+      setAuthError('Something went wrong. Please try again.')
     }
   }
 
@@ -1728,14 +1738,14 @@ function App() {
                       <button
                         type="button"
                         className={`account-mode-btn ${accountMode === 'signup' ? 'is-active' : ''}`}
-                        onClick={() => { setAccountMode('signup'); setAuthError(''); setAuthMessage('') }}
+                        onClick={() => { setAccountMode('signup'); setAuthError(''); setAuthMessage(''); setAuthLoaderActive(false) }}
                       >
                         Sign up
                       </button>
                       <button
                         type="button"
                         className={`account-mode-btn ${accountMode === 'signin' ? 'is-active' : ''}`}
-                        onClick={() => { setAccountMode('signin'); setAuthError(''); setAuthMessage('') }}
+                        onClick={() => { setAccountMode('signin'); setAuthError(''); setAuthMessage(''); setAuthLoaderActive(false) }}
                       >
                         Sign in
                       </button>
@@ -1764,12 +1774,12 @@ function App() {
                           Phone (optional)
                           <input name="phone" type="tel" autoComplete="tel" />
                         </label>
-                        <button type="submit" className="btn-small">
-                          Sign up
+                        <button type="submit" className="btn-small" disabled={authLoaderActive}>
+                          {authLoaderActive ? 'Creating account…' : 'Sign up'}
                         </button>
                         <p className="account-mode-switch">
                           Already have an account?{' '}
-                          <button type="button" className="account-mode-link" onClick={() => { setAccountMode('signin'); setAuthError(''); setAuthMessage('') }}>
+                          <button type="button" className="account-mode-link" onClick={() => { setAccountMode('signin'); setAuthError(''); setAuthMessage(''); setAuthLoaderActive(false) }}>
                             Sign in
                           </button>
                         </p>
@@ -1788,12 +1798,12 @@ function App() {
                           Password
                           <input name="password" type="password" autoComplete="current-password" required />
                         </label>
-                        <button type="submit" className="btn-small">
-                          Sign in
+                        <button type="submit" className="btn-small" disabled={authLoaderActive}>
+                          {authLoaderActive ? 'Signing in…' : 'Sign in'}
                         </button>
                         <p className="account-mode-switch">
                           Don&apos;t have an account?{' '}
-                          <button type="button" className="account-mode-link" onClick={() => { setAccountMode('signup'); setAuthError(''); setAuthMessage('') }}>
+                          <button type="button" className="account-mode-link" onClick={() => { setAccountMode('signup'); setAuthError(''); setAuthMessage(''); setAuthLoaderActive(false) }}>
                             Sign up
                           </button>
                         </p>
