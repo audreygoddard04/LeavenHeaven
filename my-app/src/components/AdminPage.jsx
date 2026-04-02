@@ -63,7 +63,7 @@ function bakeCount(orders) {
   return Object.entries(counts).sort((a, b) => b[1] - a[1])
 }
 
-export function AdminPage({ orders, profiles, onUpdateStatus, onRefresh }) {
+export function AdminPage({ orders, profiles, onUpdateStatus, onRefresh, lotwProductId, onUpdateLotw }) {
   const activeOrders = orders.filter((o) => o.status !== 'completed')
   const completedOrders = orders.filter((o) => o.status === 'completed')
   const bake = bakeCount(orders)
@@ -78,6 +78,24 @@ export function AdminPage({ orders, profiles, onUpdateStatus, onRefresh }) {
         <button type="button" className="btn-small btn-secondary" onClick={onRefresh}>
           Refresh
         </button>
+      </div>
+
+      {/* Loaf of the week picker */}
+      <div className="admin-lotw-wrap">
+        <div className="admin-lotw-header">
+          <span className="admin-lotw-title">Loaf of the Week</span>
+          <span className="admin-lotw-hint">Shown as a featured card on the Loaves page</span>
+        </div>
+        <select
+          className="admin-lotw-select"
+          value={lotwProductId ?? ''}
+          onChange={(e) => onUpdateLotw(e.target.value || null)}
+        >
+          <option value="">Auto-rotate (by week number)</option>
+          {loafProducts.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
       </div>
 
       {/* Bake summary */}

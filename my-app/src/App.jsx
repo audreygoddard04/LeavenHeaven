@@ -78,7 +78,7 @@ function getUserDisplay(authUser) {
 function App() {
   const { user: authUser, loading: authLoading } = useAuth()
   const user = getUserDisplay(authUser) ?? null
-  const { isAdmin, orders: adminOrders, profiles: adminProfiles, loadOrders: refreshAdminOrders, updateOrderStatus } = useAdmin(authUser)
+  const { isAdmin, orders: adminOrders, profiles: adminProfiles, loadOrders: refreshAdminOrders, updateOrderStatus, lotwProductId: adminLotwId, updateLotw } = useAdmin(authUser)
 
   const [cartItems, setCartItems] = useState([])
   const [favorites, setFavorites] = useState([])
@@ -205,6 +205,32 @@ function App() {
   useEffect(() => {
     window.scrollTo(0, 0)
   }, [])
+
+  // Public fetch of loaf of the week (no auth required)
+  const [publicLotwId, setPublicLotwId] = useState(null)
+  useEffect(() => {
+    supabase
+      .from('site_settings')
+      .select('value')
+      .eq('key', 'loaf_of_the_week')
+      .single()
+      .then(({ data }) => { if (data?.value) setPublicLotwId(data.value) })
+  }, [])
+
+  // Admin update syncs the public display immediately
+  const handleUpdateLotw = async (productId) => {
+    await updateLotw(productId)
+    setPublicLotwId(productId ?? null)
+  }
+
+  // The resolved featured loaf: admin pick → auto-rotation by ISO week
+  const lotwProduct = (() => {
+    const id = isAdmin ? (adminLotwId ?? publicLotwId) : publicLotwId
+    if (id) return loafProducts.find((p) => p.id === id) ?? null
+    const weekNum = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000))
+    const eligible = loafProducts.filter((p) => !p.soldOut && (!p.seasonal || p.season === currentSeason))
+    return eligible.length > 0 ? eligible[weekNum % eligible.length] : null
+  })()
 
   const navigateTo = (page) => {
     setCurrentPage(page)
@@ -833,6 +859,48 @@ function App() {
               </div>
             </div>
 
+            {/* Loaf of the week */}
+            {lotwProduct && (
+              <div className="lotw-card">
+                <div className="lotw-badge">Loaf of the Week</div>
+                <div className="lotw-inner">
+                  {LOAF_IMAGES[lotwProduct.id] && (
+                    <div className="lotw-image-wrap">
+                      <img src={LOAF_IMAGES[lotwProduct.id]} alt={lotwProduct.name} className="lotw-image" />
+                    </div>
+                  )}
+                  <div className="lotw-content">
+                    <div className="lotw-name">{lotwProduct.name}</div>
+                    <p className="lotw-description">
+                      {lotwProduct.description}{lotwProduct.inclusion ? ` It includes ${lotwProduct.inclusion}.` : ''}
+                    </p>
+                    <div className="lotw-actions">
+                      {lotwProduct.soldOut || (lotwProduct.seasonal && lotwProduct.season !== currentSeason) ? (
+                        <span className="loaf-sold-out">
+                          {lotwProduct.soldOut ? 'Sold out' : 'Out of season'}
+                        </span>
+                      ) : (
+                        <>
+                          <div className="add-btn-with-price">
+                            <button type="button" className="btn-small btn-add" onClick={() => addToCart(lotwProduct.id, 'loaf')}>
+                              Add Loaf
+                            </button>
+                            <div className="add-btn-price">${getLoafPriceForProduct(lotwProduct)}</div>
+                          </div>
+                          <div className="add-btn-with-price">
+                            <button type="button" className="btn-small btn-secondary btn-add" onClick={() => addToCart(lotwProduct.id, 'mini')}>
+                              Add Mini
+                            </button>
+                            <div className="add-btn-price">${MINI_LOAF_PRICE}</div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="loaves-grid">
               {loafProducts.filter((p) => !p.seasonal && !p.proteinCategory).map((product) => (
                 <LoafCard
@@ -1120,6 +1188,8 @@ function App() {
                 profiles={adminProfiles}
                 onUpdateStatus={updateOrderStatus}
                 onRefresh={refreshAdminOrders}
+                lotwProductId={adminLotwId}
+                onUpdateLotw={handleUpdateLotw}
               />
             </section>
           )}

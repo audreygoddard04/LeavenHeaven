@@ -6,6 +6,7 @@ export function useAdmin(authUser) {
   const [orders, setOrders] = useState([])
   const [profiles, setProfiles] = useState({})
   const [loading, setLoading] = useState(true)
+  const [lotwProductId, setLotwProductId] = useState(null)
 
   useEffect(() => {
     if (!authUser) {
@@ -49,9 +50,21 @@ export function useAdmin(authUser) {
     }
   }, [])
 
+  const loadLotw = useCallback(async () => {
+    const { data } = await supabase
+      .from('site_settings')
+      .select('value')
+      .eq('key', 'loaf_of_the_week')
+      .single()
+    setLotwProductId(data?.value ?? null)
+  }, [])
+
   useEffect(() => {
-    if (isAdmin) loadOrders()
-  }, [isAdmin, loadOrders])
+    if (isAdmin) {
+      loadOrders()
+      loadLotw()
+    }
+  }, [isAdmin, loadOrders, loadLotw])
 
   const updateOrderStatus = async (orderId, status) => {
     const { error } = await supabase
@@ -65,5 +78,13 @@ export function useAdmin(authUser) {
     return { error }
   }
 
-  return { isAdmin, orders, profiles, loading, loadOrders, updateOrderStatus }
+  const updateLotw = async (productId) => {
+    const { error } = await supabase
+      .from('site_settings')
+      .upsert({ key: 'loaf_of_the_week', value: productId ?? null })
+    if (!error) setLotwProductId(productId ?? null)
+    return { error }
+  }
+
+  return { isAdmin, orders, profiles, loading, loadOrders, updateOrderStatus, lotwProductId, updateLotw }
 }
