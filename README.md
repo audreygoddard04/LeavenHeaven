@@ -15,16 +15,17 @@ Leaven Heaven is a sourdough bakery storefront built with:
 
 ## Development
 
-Install dependencies:
-
 ```bash
-npm install
+cd my-app && npm install && npm run dev
 ```
 
-Run locally:
+Environment variables: copy `my-app/.env.example` to `my-app/.env.local` and add your Supabase keys.
 
-```bash
-npm run dev
-```
+## Deployment (Vercel)
 
-Environment variables are required for Supabase and Stripe. See `.env.example` for configuration.
+1. Connect the repo at [vercel.com](https://vercel.com) → Import → `audreygoddard04/LeavenHeaven`
+2. Add environment variables in Project Settings:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+3. Deploy. The `vercel.json` config builds from `my-app/`.
+4. Add your domain (e.g. leavenheaven.shop) in Vercel → Domains.
