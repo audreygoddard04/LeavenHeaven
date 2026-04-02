@@ -236,6 +236,8 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showAuthPrompt, setShowAuthPrompt] = useState(false)
   const [accountMode, setAccountMode] = useState('signup') // 'signin' | 'signup'
+  const [authError, setAuthError] = useState('')
+  const [authMessage, setAuthMessage] = useState('')
   const searchRef = useRef(null)
 
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
@@ -248,31 +250,36 @@ function App() {
         p.name.toLowerCase().includes(searchQuery.toLowerCase()),
       )
 
+  const favKey = authUser ? `lh_favorites_${authUser.id}` : null
+
+  // Load favorites and orders when user identity is known
   useEffect(() => {
+    if (authLoading) return
     if (typeof window === 'undefined') return
     try {
-      const storedFavs = window.localStorage.getItem('lh_favorites')
       const storedOrders = window.localStorage.getItem('lh_orders')
-      if (storedFavs) {
-        setFavorites(JSON.parse(storedFavs))
+      if (storedOrders) setOrders(JSON.parse(storedOrders))
+
+      if (favKey) {
+        const storedFavs = window.localStorage.getItem(favKey)
+        setFavorites(storedFavs ? JSON.parse(storedFavs) : [])
+      } else {
+        setFavorites([])
       }
-      if (storedOrders) {
-        setOrders(JSON.parse(storedOrders))
-      }
-      // User comes from Supabase auth only - see auth useEffect below
     } catch {
       // ignore
     }
-  }, [])
+  }, [authLoading, authUser?.id, favKey])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
+    if (!favKey) return
     try {
-      window.localStorage.setItem('lh_favorites', JSON.stringify(favorites))
+      window.localStorage.setItem(favKey, JSON.stringify(favorites))
     } catch {
       // ignore
     }
-  }, [favorites])
+  }, [favorites, favKey])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -394,6 +401,11 @@ function App() {
 
   const placePreorder = () => {
     if (cartItems.length === 0) return
+    if (!authUser) {
+      navigateTo('account')
+      setAuthMessage('Please sign in to place a pre-order.')
+      return
+    }
     const createdAt = new Date().toISOString()
     const order = {
       id: `order-${createdAt}`,
@@ -440,6 +452,8 @@ function App() {
 
   const handleSignIn = async (event) => {
     event.preventDefault()
+    setAuthError('')
+    setAuthMessage('')
     const formData = new FormData(event.currentTarget)
     const email = formData.get('email')?.toString().trim() ?? ''
     const password = formData.get('password')?.toString().trim() ?? ''
@@ -447,13 +461,18 @@ function App() {
 
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
-      // eslint-disable-next-line no-console
-      console.error('Sign in error', error)
+      if (error.message?.toLowerCase().includes('invalid login')) {
+        setAuthError('Incorrect email or password. Please try again.')
+      } else {
+        setAuthError(error.message ?? 'Sign in failed. Please try again.')
+      }
     }
   }
 
   const handleSignUp = async (event) => {
     event.preventDefault()
+    setAuthError('')
+    setAuthMessage('')
     const formData = new FormData(event.currentTarget)
     const name = formData.get('name')?.toString().trim() ?? ''
     const email = formData.get('email')?.toString().trim() ?? ''
@@ -466,20 +485,31 @@ function App() {
       password,
       options: { data: { full_name: name } },
     })
+
     if (error) {
-      // eslint-disable-next-line no-console
-      console.error('Sign up error', error)
+      if (error.message?.toLowerCase().includes('already registered') || error.message?.toLowerCase().includes('already been registered') || error.status === 422) {
+        setAuthError('An account with this email already exists.')
+        setAccountMode('signin')
+      } else {
+        setAuthError(error.message ?? 'Sign up failed. Please try again.')
+      }
       return
     }
+
+    // Supabase returns a user with empty identities when email is already taken (email confirm enabled)
+    if (data?.user && (!data.user.identities || data.user.identities.length === 0)) {
+      setAuthError('An account with this email already exists.')
+      setAccountMode('signin')
+      return
+    }
+
     if (data?.user) {
-      const { error: profileError } = await supabase.from('profiles').upsert(
+      await supabase.from('profiles').upsert(
         { id: data.user.id, display_name: name || email?.split('@')[0], phone: phone || null },
         { onConflict: 'id' },
       )
-      if (profileError) {
-        // eslint-disable-next-line no-console
-        console.error('Profile upsert error', profileError)
-      }
+      setAuthMessage('Check your email to confirm your account, then sign in.')
+      setAccountMode('signin')
     }
   }
 
@@ -1111,6 +1141,13 @@ function App() {
                   {includeSample && <p className="cart-sample-beneath">+ Free sample</p>}
                 </div>
                 <div className="cart-actions">
+                  {!authUser && cartItems.length > 0 && (
+                    <p className="cart-auth-notice">
+                      <button type="button" className="account-mode-link" onClick={() => navigateTo('account')}>
+                        Sign in
+                      </button>{' '}to place your pre-order.
+                    </p>
+                  )}
                   <button
                     type="button"
                     className="btn-small"
@@ -1682,18 +1719,24 @@ function App() {
                       <button
                         type="button"
                         className={`account-mode-btn ${accountMode === 'signup' ? 'is-active' : ''}`}
-                        onClick={() => setAccountMode('signup')}
+                        onClick={() => { setAccountMode('signup'); setAuthError(''); setAuthMessage('') }}
                       >
                         Sign up
                       </button>
                       <button
                         type="button"
                         className={`account-mode-btn ${accountMode === 'signin' ? 'is-active' : ''}`}
-                        onClick={() => setAccountMode('signin')}
+                        onClick={() => { setAccountMode('signin'); setAuthError(''); setAuthMessage('') }}
                       >
                         Sign in
                       </button>
                     </div>
+                    {authMessage && (
+                      <p className="account-auth-message">{authMessage}</p>
+                    )}
+                    {authError && (
+                      <p className="account-auth-error">{authError}</p>
+                    )}
                     {accountMode === 'signup' ? (
                       <form className="account-form" onSubmit={handleSignUp}>
                         <label>
@@ -1717,7 +1760,7 @@ function App() {
                         </button>
                         <p className="account-mode-switch">
                           Already have an account?{' '}
-                          <button type="button" className="account-mode-link" onClick={() => setAccountMode('signin')}>
+                          <button type="button" className="account-mode-link" onClick={() => { setAccountMode('signin'); setAuthError(''); setAuthMessage('') }}>
                             Sign in
                           </button>
                         </p>
@@ -1741,7 +1784,7 @@ function App() {
                         </button>
                         <p className="account-mode-switch">
                           Don&apos;t have an account?{' '}
-                          <button type="button" className="account-mode-link" onClick={() => setAccountMode('signup')}>
+                          <button type="button" className="account-mode-link" onClick={() => { setAccountMode('signup'); setAuthError(''); setAuthMessage('') }}>
                             Sign up
                           </button>
                         </p>
@@ -1837,8 +1880,6 @@ function App() {
             © Leaven Heaven – sourdough &amp; macro-friendly bakery.
           </span>
           <span>
-            Building out licensing, kitchen, equipment &amp; supplier details
-            now. Opening timeline: aiming for phased launch over the next few
             months.
           </span>
         </div>

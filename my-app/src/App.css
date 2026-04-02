@@ -3196,3 +3196,29 @@ footer {
   margin-top: 16px;
   width: 100%;
 }
+
+.account-auth-error {
+  font-size: 13px;
+  color: #c0392b;
+  background: #fdf0ee;
+  border: 1px solid #e8b5b0;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 0 0 12px;
+}
+
+.account-auth-message {
+  font-size: 13px;
+  color: #276228;
+  background: #eef7ee;
+  border: 1px solid #a8d5a8;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 0 0 12px;
+}
+
+.cart-auth-notice {
+  font-size: 13px;
+  color: var(--text-muted, #666);
+  margin: 0 0 8px;
+}
