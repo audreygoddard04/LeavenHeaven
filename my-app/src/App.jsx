@@ -502,7 +502,7 @@ function App() {
       if (msg.toLowerCase().includes('invalid login') || msg.toLowerCase().includes('invalid credentials')) {
         setAuthError('Incorrect email or password. If you signed up with Google, use "Sign in with Google" below.')
       } else if (msg.toLowerCase().includes('email not confirmed')) {
-        setAuthError('Please confirm your email first — check your inbox for the confirmation link we sent you.')
+        setAuthError('Please confirm your email first — check your inbox for a confirmation link from LeavenHeaven.')
       } else {
         setAuthError(msg || 'Sign in failed. Please try again.')
       }
@@ -512,7 +512,7 @@ function App() {
     // Enforce email confirmation even if Supabase allows the session through
     if (signInData?.user && !signInData.user.email_confirmed_at) {
       await supabase.auth.signOut()
-      setAuthError('Please confirm your email before signing in. Check your inbox for the confirmation link we sent when you signed up.')
+      setAuthError('Please confirm your email before signing in — check your inbox for a confirmation link from LeavenHeaven.')
     }
   }
 
