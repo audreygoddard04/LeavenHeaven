@@ -336,20 +336,29 @@ function App() {
       return sum + unitPrice * item.quantity * 100
     }, 0)
 
-    // `items` JSONB holds { lines, includeSample } when include_sample column is missing.
+    // 001_init: money columns + (after migration 010) items + pickup_date.
+    // 004-style: items + total_cents + pickup_date, no subtotal/delivery.
+    const pickupIso = pickupDate.toISOString().split('T')[0]
+    const itemsPayload = buildOrderItemsPayload(cartItems, includeSample)
     const orderId = crypto.randomUUID()
-    const { data: newOrder, error } = await supabase
-      .from('orders')
-      .insert({
-        id: orderId,
-        user_id: authUser.id,
-        items: buildOrderItemsPayload(cartItems, includeSample),
-        status: 'pending',
-        total_cents: totalCents,
-        pickup_date: pickupDate.toISOString().split('T')[0],
-      })
-      .select()
-      .single()
+    const baseRow = {
+      id: orderId,
+      user_id: authUser.id,
+      items: itemsPayload,
+      status: 'pending',
+      total_cents: totalCents,
+      pickup_date: pickupIso,
+    }
+    const legacyMoneyRow = {
+      ...baseRow,
+      subtotal_cents: totalCents,
+      delivery_cents: 0,
+    }
+
+    let { data: newOrder, error } = await supabase.from('orders').insert(legacyMoneyRow).select().single()
+    if (error && /subtotal|delivery_cents|schema cache/i.test(error.message ?? '')) {
+      ({ data: newOrder, error } = await supabase.from('orders').insert(baseRow).select().single())
+    }
 
     if (error) {
       console.error('Failed to save order:', error)
@@ -358,6 +367,10 @@ function App() {
         setOrderError('Your order could not be saved (database permissions). Please contact the bakery.')
       } else if (msg.includes('foreign key') || msg.includes('profiles')) {
         setOrderError('Account setup is incomplete. Try signing out and back in, then try again.')
+      } else if (msg.includes('items') || msg.includes('schema cache') || msg.includes('pickup_date')) {
+        setOrderError(
+          'Database setup is incomplete. In Supabase → SQL → New query, paste and run supabase/migrations/010_orders_app_columns.sql from this project, then try again.',
+        )
       } else {
         setOrderError(`Could not place your order: ${msg}`)
       }
