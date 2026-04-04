@@ -82,6 +82,11 @@ function getLotwWeekId() {
 
 // ── End pickup-window utilities ──────────────────────────────────────────────
 
+// ── Pickup location ── update VITE_PICKUP_ADDRESS in your .env.local ─────────
+const PICKUP_ADDRESS = import.meta.env.VITE_PICKUP_ADDRESS ?? 'Address TBA — check your email'
+const PICKUP_NOTES   = import.meta.env.VITE_PICKUP_NOTES   ?? ''
+// ─────────────────────────────────────────────────────────────────────────────
+
 function getUserDisplay(authUser) {
   if (!authUser) return null
   const meta = authUser.user_metadata || {}
@@ -115,6 +120,7 @@ function App() {
   const [authMessage, setAuthMessage] = useState('')
   const [authLoaderActive, setAuthLoaderActive] = useState(false)
   const [orderError, setOrderError] = useState(null)
+  const [orderSuccess, setOrderSuccess] = useState(null)
   const [publicLotwId, setPublicLotwId] = useState(null)
 
   const currentSeason = getCurrentSeason()
@@ -340,6 +346,27 @@ function App() {
       return
     }
 
+    // Resolve item names for the confirmation + email
+    const resolvedItems = cartItems.map((item) => {
+      if (item.productId === 'custom') return { name: 'Custom Loaf', size: item.size, quantity: item.quantity }
+      const product = loafProducts.find((p) => p.id === item.productId)
+      return { name: product?.name ?? item.productId, size: item.size, quantity: item.quantity }
+    })
+
+    // Fire-and-forget: send confirmation email via Edge Function
+    if (authUser.email) {
+      supabase.functions.invoke('order-confirmation', {
+        body: {
+          to: authUser.email,
+          customerName: user?.name ?? 'there',
+          items: resolvedItems,
+          pickupDate: newOrder.pickup_date,
+          includeSample,
+          totalCents,
+        },
+      }).catch((err) => console.warn('[email] order-confirmation failed:', err))
+    }
+
     setOrders((prev) => [{
       id: newOrder.id,
       createdAt: newOrder.created_at,
@@ -348,6 +375,13 @@ function App() {
       status: 'pending',
       pickupDate: newOrder.pickup_date,
     }, ...prev])
+    setOrderSuccess({
+      id: newOrder.id,
+      items: resolvedItems,
+      pickupDate: newOrder.pickup_date,
+      includeSample,
+      totalCents,
+    })
     clearCart()
   }
 
@@ -686,6 +720,52 @@ function App() {
             </div>
             <div className="preorder-store-grid">
               <aside className="cart-summary">
+                {orderSuccess ? (
+                  <div className="order-confirm">
+                    <div className="order-confirm-check">✓</div>
+                    <div className="order-confirm-title">Order placed!</div>
+
+                    <div className="order-confirm-section">
+                      <div className="order-confirm-label">Your items</div>
+                      {orderSuccess.items.map((item, i) => (
+                        <div key={i} className="order-confirm-item">
+                          {item.quantity}× {item.name}
+                          <span className="order-confirm-item-size">{item.size === 'mini' ? ' (Mini)' : ''}</span>
+                        </div>
+                      ))}
+                      {orderSuccess.includeSample && (
+                        <div className="order-confirm-item order-confirm-item--sample">+ Free sample loaf</div>
+                      )}
+                    </div>
+
+                    <div className="order-confirm-section order-confirm-pickup">
+                      <div className="order-confirm-label">Pickup</div>
+                      <div className="order-confirm-pickup-date">
+                        📅{' '}
+                        {new Date(orderSuccess.pickupDate + 'T12:00:00').toLocaleDateString('en-US', {
+                          weekday: 'long', month: 'long', day: 'numeric',
+                        })}
+                      </div>
+                      <div className="order-confirm-pickup-addr">📍 {PICKUP_ADDRESS}</div>
+                      {PICKUP_NOTES && <div className="order-confirm-pickup-notes">{PICKUP_NOTES}</div>}
+                    </div>
+
+                    {authUser?.email && (
+                      <p className="order-confirm-email">
+                        A confirmation email is on its way to <strong>{authUser.email}</strong>.
+                      </p>
+                    )}
+
+                    <button
+                      type="button"
+                      className="btn-small btn-secondary"
+                      onClick={() => setOrderSuccess(null)}
+                    >
+                      Place another order
+                    </button>
+                  </div>
+                ) : (
+                <>
                 <div className="cart-summary-heading">
                   <h2 className="cart-summary-title">Cart</h2>
                 </div>
@@ -785,6 +865,8 @@ function App() {
                     Place pre-order
                   </button>
                 </div>
+                </>
+                )}
               </aside>
 
               <div className="preorder-products">

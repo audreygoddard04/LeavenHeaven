@@ -2775,6 +2775,98 @@ section {
   margin: 0 0 6px;
 }
 
+/* ── Order confirmation ── */
+.order-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 8px 0;
+}
+
+.order-confirm-check {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #214535;
+  color: #fdfaf7;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.order-confirm-title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  margin: -6px 0 0;
+}
+
+.order-confirm-section {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.order-confirm-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+
+.order-confirm-item {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.order-confirm-item-size {
+  color: var(--muted);
+}
+
+.order-confirm-item--sample {
+  font-style: italic;
+  color: #214535;
+}
+
+.order-confirm-pickup {
+  background: #f5f0e8;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.order-confirm-pickup-date {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.order-confirm-pickup-addr {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.order-confirm-pickup-notes {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.order-confirm-email {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.order-confirm-email strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
 /* ── Account page pickup date ── */
 .order-row-pickup {
   font-size: 11px;
