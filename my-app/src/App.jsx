@@ -7,6 +7,7 @@ import { FavoritesList } from './components/FavoritesList'
 import { NavBar } from './components/NavBar'
 import { AdminPage } from './components/AdminPage'
 import { supabase } from './lib/supabaseClient'
+import { buildOrderItemsPayload, getOrderLines, getOrderIncludeSample } from './lib/orderHelpers'
 import { useAuth } from './hooks/useAuth'
 import { useAdmin } from './hooks/useAdmin'
 import {
@@ -174,8 +175,8 @@ function App() {
           if (data) setOrders(data.map(row => ({
             id: row.id,
             createdAt: row.created_at,
-            items: row.items,
-            includeSample: row.include_sample,
+            items: getOrderLines(row.items),
+            includeSample: getOrderIncludeSample(row.include_sample, row.items),
             status: row.status,
             pickupDate: row.pickup_date ?? null,
           })))
@@ -335,18 +336,14 @@ function App() {
       return sum + unitPrice * item.quantity * 100
     }, 0)
 
-    // Only columns that exist on the shipped `004_orders_table` schema:
-    // id, user_id, items, include_sample, status, total_cents, pickup_date (006).
-    // Do NOT send subtotal_cents / delivery_cents — those exist only on 001_init
-    // and break PostgREST if the table was created from 004.
+    // `items` JSONB holds { lines, includeSample } when include_sample column is missing.
     const orderId = crypto.randomUUID()
     const { data: newOrder, error } = await supabase
       .from('orders')
       .insert({
         id: orderId,
         user_id: authUser.id,
-        items: cartItems,
-        include_sample: includeSample,
+        items: buildOrderItemsPayload(cartItems, includeSample),
         status: 'pending',
         total_cents: totalCents,
         pickup_date: pickupDate.toISOString().split('T')[0],

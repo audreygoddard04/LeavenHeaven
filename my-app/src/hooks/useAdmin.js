@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { getOrderLines, getOrderIncludeSample } from '../lib/orderHelpers'
 
 // Returns the local timestamp of the most recent Friday at 8:00 AM —
 // used as a week ID that advances every Friday morning.
@@ -44,7 +45,11 @@ export function useAdmin(authUser) {
 
     if (error || !ordersData) return
 
-    setOrders(ordersData)
+    setOrders(ordersData.map((row) => ({
+      ...row,
+      items: getOrderLines(row.items),
+      include_sample: getOrderIncludeSample(row.include_sample, row.items),
+    })))
 
     const userIds = [...new Set(ordersData.map((o) => o.user_id))]
     if (userIds.length === 0) return
