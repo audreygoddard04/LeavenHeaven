@@ -650,19 +650,6 @@ function App() {
             </button>
           </div>
 
-          <div className="slogan-banner slogan-banner--top">
-            <div className="slogan-track">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="slogan-track__part" aria-hidden="true">
-                  <span>Healthy quality ingredients</span>
-                  <span>Your body will thank you</span>
-                  <span>Indulge without guilt</span>
-                  <span>Your macro friendly bakery </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
           {countdown && (
             <div className="site-cutoff-banner" onClick={() => navigateTo('preorder')}>
               <span className="site-cutoff-banner-label">This Sunday's order cutoff</span>
@@ -689,6 +676,21 @@ function App() {
               </div>
             </div>
           </section>
+
+          <div className="home-banner-strip" style={{ display: currentPage === 'home' ? undefined : 'none' }}>
+            <div className="slogan-banner slogan-banner--top">
+              <div className="slogan-track">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="slogan-track__part" aria-hidden="true">
+                    <span>Healthy quality ingredients</span>
+                    <span>Your body will thank you</span>
+                    <span>Indulge without guilt</span>
+                    <span>Your macro friendly bakery </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
 
           <section id="mission" className={currentPage === 'home' ? '' : 'is-hidden'}>
             <div className="section-heading">

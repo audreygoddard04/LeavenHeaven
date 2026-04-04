@@ -637,7 +637,7 @@ main {
   padding-inline: 0;
   white-space: nowrap;
   width: max-content;
-  animation: banner-scroll 24s linear infinite;
+  animation: banner-scroll 60s linear infinite;
 }
 
 .slogan-track__part {
@@ -887,8 +887,8 @@ main {
   max-width: 100vw;
   margin-left: calc(-1 * clamp(28px, 8vw, 64px));
   padding: 9px 16px;
-  background: #214535;
-  color: #fdfaf7;
+  background: var(--bg);
+  border-block: 1px solid var(--border-soft);
   text-align: center;
   box-sizing: border-box;
   margin-bottom: 0;
@@ -898,7 +898,7 @@ main {
   display: inline-block;
   border: none;
   background: transparent;
-  color: #fdfaf7;
+  color: var(--muted);
   font-family: inherit;
   font-size: 11px;
   font-weight: 700;
@@ -2426,6 +2426,11 @@ section {
 }
 
 /* ── Sitewide cutoff banner (inline, beneath scrolling slogan) ── */
+.home-banner-strip {
+  margin-top: 56px;
+  margin-bottom: 56px;
+}
+
 .site-cutoff-banner {
   width: calc(100% + 2 * clamp(28px, 8vw, 64px));
   max-width: 100vw;
@@ -2441,7 +2446,7 @@ section {
   border-bottom: 1px solid rgba(255,255,255,0.08);
   cursor: pointer;
   transition: background 0.15s;
-  margin-bottom: 28px;
+  margin-bottom: 0;
 }
 .site-cutoff-banner:hover {
   background: #214535;
@@ -3069,8 +3074,7 @@ section {
 .btn-sample:focus,
 .btn-sample:focus-visible,
 .btn-sample:hover:not(:disabled) {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline: none;
 }
 
 .btn-sample:disabled {
@@ -3175,8 +3179,7 @@ section {
 .account-form button:focus,
 .account-form button:focus-visible,
 .account-form button:hover {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline: none;
 }
 
 .account-form label {
@@ -3474,8 +3477,7 @@ footer {
 
 /* Build Your Loaf */
 .build-your-loaf {
-  max-width: 900px;
-  margin: 0 auto;
+  width: 100%;
 }
 
 .build-your-loaf-header {
