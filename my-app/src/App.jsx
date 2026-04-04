@@ -8,6 +8,7 @@ import { NavBar } from './components/NavBar'
 import { AdminPage } from './components/AdminPage'
 import { supabase } from './lib/supabaseClient'
 import { buildOrderItemsPayload, getOrderLines, getOrderIncludeSample } from './lib/orderHelpers'
+import { resolvePickupWindowId } from './lib/pickupWindow'
 import { useAuth } from './hooks/useAuth'
 import { useAdmin } from './hooks/useAdmin'
 import {
@@ -339,6 +340,7 @@ function App() {
     // 001_init: money columns + (after migration 010) items + pickup_date.
     // 004-style: items + total_cents + pickup_date, no subtotal/delivery.
     const pickupIso = pickupDate.toISOString().split('T')[0]
+    const pickupWindowId = await resolvePickupWindowId(supabase, pickupIso)
     const itemsPayload = buildOrderItemsPayload(cartItems, includeSample)
     const orderId = crypto.randomUUID()
     const baseRow = {
@@ -348,6 +350,7 @@ function App() {
       status: 'pending',
       total_cents: totalCents,
       pickup_date: pickupIso,
+      pickup_window_id: pickupWindowId,
     }
     const legacyMoneyRow = {
       ...baseRow,
@@ -369,7 +372,7 @@ function App() {
         setOrderError('Account setup is incomplete. Try signing out and back in, then try again.')
       } else if (msg.includes('pickup_window_id')) {
         setOrderError(
-          'Database setup: run supabase/migrations/011_orders_pickup_window_nullable.sql in Supabase SQL Editor (the app uses pickup_date for the Sunday, not pickup_window_id).',
+          'Pickup window: in Supabase SQL Editor, run: ALTER TABLE public.orders ALTER COLUMN pickup_window_id DROP NOT NULL; — Or set VITE_PICKUP_WINDOW_ID in .env to a UUID from your pickup_windows table.',
         )
       } else if (msg.includes('items') || msg.includes('schema cache') || msg.includes('pickup_date')) {
         setOrderError(

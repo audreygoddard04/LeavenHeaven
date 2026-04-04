@@ -1,6 +1,15 @@
 -- 011_orders_pickup_window_nullable.sql
--- The app stores the Sunday in pickup_date (DATE). If pickup_window_id was added
--- as NOT NULL without a default, inserts fail. Allow NULL so pickup_date is enough.
+-- The app stores the Sunday in orders.pickup_date. If pickup_window_id is NOT NULL
+-- with no default, inserts fail. Run this once in Supabase SQL Editor.
 
-ALTER TABLE public.orders
-  ALTER COLUMN pickup_window_id DROP NOT NULL;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'orders'
+      AND column_name = 'pickup_window_id'
+  ) THEN
+    EXECUTE 'ALTER TABLE public.orders ALTER COLUMN pickup_window_id DROP NOT NULL';
+  END IF;
+END $$;
