@@ -335,16 +335,19 @@ function App() {
       return sum + unitPrice * item.quantity * 100
     }, 0)
 
+    // Only columns that exist on the shipped `004_orders_table` schema:
+    // id, user_id, items, include_sample, status, total_cents, pickup_date (006).
+    // Do NOT send subtotal_cents / delivery_cents — those exist only on 001_init
+    // and break PostgREST if the table was created from 004.
+    const orderId = crypto.randomUUID()
     const { data: newOrder, error } = await supabase
       .from('orders')
       .insert({
+        id: orderId,
         user_id: authUser.id,
         items: cartItems,
         include_sample: includeSample,
         status: 'pending',
-        // Legacy schema (001_init) requires subtotal_cents + delivery_cents NOT NULL
-        subtotal_cents: totalCents,
-        delivery_cents: 0,
         total_cents: totalCents,
         pickup_date: pickupDate.toISOString().split('T')[0],
       })
