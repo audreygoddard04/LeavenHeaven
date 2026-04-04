@@ -367,6 +367,10 @@ function App() {
         setOrderError('Your order could not be saved (database permissions). Please contact the bakery.')
       } else if (msg.includes('foreign key') || msg.includes('profiles')) {
         setOrderError('Account setup is incomplete. Try signing out and back in, then try again.')
+      } else if (msg.includes('pickup_window_id')) {
+        setOrderError(
+          'Database setup: run supabase/migrations/011_orders_pickup_window_nullable.sql in Supabase SQL Editor (the app uses pickup_date for the Sunday, not pickup_window_id).',
+        )
       } else if (msg.includes('items') || msg.includes('schema cache') || msg.includes('pickup_date')) {
         setOrderError(
           'Database setup is incomplete. In Supabase → SQL → New query, paste and run supabase/migrations/010_orders_app_columns.sql from this project, then try again.',
