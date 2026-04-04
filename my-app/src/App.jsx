@@ -342,6 +342,9 @@ function App() {
         items: cartItems,
         include_sample: includeSample,
         status: 'pending',
+        // Legacy schema (001_init) requires subtotal_cents + delivery_cents NOT NULL
+        subtotal_cents: totalCents,
+        delivery_cents: 0,
         total_cents: totalCents,
         pickup_date: pickupDate.toISOString().split('T')[0],
       })
@@ -349,8 +352,15 @@ function App() {
       .single()
 
     if (error) {
-      console.error('Failed to save order:', error.message)
-      setOrderError('Something went wrong placing your order. Please try again.')
+      console.error('Failed to save order:', error)
+      const msg = error.message ?? ''
+      if (msg.includes('row-level security') || msg.includes('RLS')) {
+        setOrderError('Your order could not be saved (database permissions). Please contact the bakery.')
+      } else if (msg.includes('foreign key') || msg.includes('profiles')) {
+        setOrderError('Account setup is incomplete. Try signing out and back in, then try again.')
+      } else {
+        setOrderError(`Could not place your order: ${msg}`)
+      }
       return
     }
 
