@@ -12,11 +12,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
-const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
-const FROM_EMAIL     = Deno.env.get('FROM_EMAIL')     ?? 'LeavenHeaven <noreply@leavenheaven.com>'
-const PICKUP_ADDRESS = Deno.env.get('PICKUP_ADDRESS') ?? 'Address not configured'
-const PICKUP_NOTES   = Deno.env.get('PICKUP_NOTES')   ?? ''
-const REPLY_TO       = 'audreyannagoddard@gmail.com'
+const REPLY_TO = 'audreyannagoddard@gmail.com'
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -27,6 +23,12 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: cors })
   }
+
+  // Read secrets fresh on every request so updates take effect without redeployment
+  const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
+  const FROM_EMAIL     = Deno.env.get('FROM_EMAIL')     ?? 'LeavenHeaven <orders@leavenheaven.shop>'
+  const PICKUP_ADDRESS = Deno.env.get('PICKUP_ADDRESS') ?? 'Address not configured'
+  const PICKUP_NOTES   = Deno.env.get('PICKUP_NOTES')   ?? ''
 
   try {
     const {
@@ -110,6 +112,16 @@ serve(async (req) => {
 </body>
 </html>`
 
+    if (!RESEND_API_KEY) {
+      console.error('[order-confirmation] RESEND_API_KEY secret is not set')
+      return new Response(JSON.stringify({ error: 'RESEND_API_KEY not configured' }), {
+        headers: { ...cors, 'Content-Type': 'application/json' },
+        status: 500,
+      })
+    }
+
+    console.log(`[order-confirmation] sending to=${to} from=${FROM_EMAIL}`)
+
     const resendRes = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -126,12 +138,18 @@ serve(async (req) => {
     })
 
     const result = await resendRes.json()
+    if (!resendRes.ok) {
+      console.error('[order-confirmation] Resend error:', JSON.stringify(result))
+    } else {
+      console.log('[order-confirmation] email sent, id:', result.id)
+    }
     return new Response(JSON.stringify(result), {
       headers: { ...cors, 'Content-Type': 'application/json' },
       status: resendRes.ok ? 200 : 400,
     })
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
+    console.error('[order-confirmation] exception:', msg)
     return new Response(JSON.stringify({ error: msg }), {
       headers: { ...cors, 'Content-Type': 'application/json' },
       status: 500,

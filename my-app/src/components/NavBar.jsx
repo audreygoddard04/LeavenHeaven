@@ -156,6 +156,24 @@ export function NavBar({
             </button>
           </nav>
 
+          {/* Mobile-only: account + cart always visible beside hamburger */}
+          <div className="nav-mobile-icons">
+            <button
+              type="button"
+              className="nav-cart"
+              onClick={() => onNavigate('preorder')}
+              aria-label={cartCount > 0 ? `Open pre-order cart (${cartCount} items)` : 'Open pre-order cart'}
+            >
+              <span className="nav-cart-icon-wrap">
+                <CartIcon />
+                {cartCount > 0 && <span className="nav-cart-count" aria-hidden="true">{cartCount}</span>}
+              </span>
+            </button>
+            <button type="button" className="nav-user" onClick={() => onNavigate('account')} aria-label="My account">
+              <UserIcon />
+            </button>
+          </div>
+
           <button
             type="button"
             className="nav-toggle"
@@ -173,7 +191,7 @@ export function NavBar({
                 key={page}
                 type="button"
                 className={currentPage === page ? 'is-active' : ''}
-                onClick={() => onNavigate(page)}
+                onClick={() => { onNavigate(page); onToggleNav() }}
               >
                 {label}
               </button>
@@ -181,22 +199,8 @@ export function NavBar({
             <button type="button" className="nav-search" onClick={onSearchToggle} aria-label="Search">
               <SearchIcon />
             </button>
-            <button
-              type="button"
-              className="nav-cart"
-              onClick={() => onNavigate('preorder')}
-              aria-label={cartCount > 0 ? `Open pre-order cart (${cartCount} items)` : 'Open pre-order cart'}
-            >
-              <span className="nav-cart-icon-wrap">
-                <CartIcon />
-                {cartCount > 0 && <span className="nav-cart-count" aria-hidden="true">{cartCount}</span>}
-              </span>
-            </button>
             <button type="button" className="nav-favorites" onClick={onFavoritesNav} aria-label="View favorites">
               <HeartIcon />
-            </button>
-            <button type="button" className="nav-user" onClick={() => onNavigate('account')} aria-label="My account">
-              <UserIcon />
             </button>
           </nav>
         )}

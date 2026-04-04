@@ -59,18 +59,11 @@ function getNextCutoff() {
 
 function formatCountdown(ms) {
   if (ms <= 0) return null
-  const oneDay = 24 * 60 * 60 * 1000
-  if (ms > oneDay) {
-    const d = Math.floor(ms / oneDay)
-    const rem = ms % oneDay
-    const h = Math.floor(rem / (60 * 60 * 1000))
-    if (h > 0) return `${d}d ${h}h`
-    return `${d} day${d === 1 ? '' : 's'}`
-  }
-  const h = Math.floor(ms / 3600000)
+  const d = Math.floor(ms / 86400000)
+  const h = Math.floor((ms % 86400000) / 3600000)
   const m = Math.floor((ms % 3600000) / 60000)
   const s = Math.floor((ms % 60000) / 1000)
-  return `${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`
+  return `${d}d ${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`
 }
 
 // ── Loaf-of-the-week week ID ─────────────────────────────────────────────────
@@ -194,7 +187,13 @@ function App() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    if (params.get('next') === 'account') setCurrentPage('account')
+    if (params.get('next') === 'account') {
+      setCurrentPage('account')
+      window.location.hash = 'account'
+      // Remove ?next so reloads don't redirect again
+      const clean = window.location.pathname
+      window.history.replaceState(null, '', clean + '#account')
+    }
   }, [])
 
   // Only redirect to account after an OAuth or email-confirmation callback
@@ -329,6 +328,15 @@ function App() {
       return
     }
     setOrderError(null)
+    try {
+      await _placePreorder()
+    } catch (err) {
+      console.error('[placePreorder] unhandled exception:', err)
+      setOrderError('Something went wrong. Please try again.')
+    }
+  }
+
+  const _placePreorder = async () => {
 
     const totalCents = cartItems.reduce((sum, item) => {
       if (item.productId === 'custom') return sum + (item.custom?.unitPrice ?? 0) * item.quantity * 100
@@ -391,32 +399,47 @@ function App() {
       return { name: product?.name ?? item.productId, size: item.size, quantity: item.quantity }
     })
 
-    // Fire-and-forget: send confirmation email via Edge Function
+    // Use pickupIso as fallback in case the insert didn't return the row
+    const savedPickupDate = newOrder?.pickup_date ?? pickupIso
+    const savedOrderId = newOrder?.id ?? orderId
+
+    // Send confirmation email via Edge Function
     if (authUser.email) {
+      console.log('[email] invoking order-confirmation for', authUser.email)
       supabase.functions.invoke('order-confirmation', {
         body: {
           to: authUser.email,
           customerName: user?.name ?? 'there',
           items: resolvedItems,
-          pickupDate: newOrder.pickup_date,
+          pickupDate: savedPickupDate,
           includeSample,
           totalCents,
         },
+      }).then(({ data, error }) => {
+        if (error) {
+          console.warn('[email] edge function error:', error)
+        } else if (data?.error) {
+          console.warn('[email] resend error:', data.error, data)
+        } else {
+          console.log('[email] sent ok, id:', data?.id)
+        }
       }).catch((err) => console.warn('[email] order-confirmation failed:', err))
+    } else {
+      console.warn('[email] skipped — authUser.email is empty')
     }
 
     setOrders((prev) => [{
-      id: newOrder.id,
-      createdAt: newOrder.created_at,
+      id: savedOrderId,
+      createdAt: newOrder?.created_at ?? new Date().toISOString(),
       items: cartItems,
       includeSample,
       status: 'pending',
-      pickupDate: newOrder.pickup_date,
+      pickupDate: savedPickupDate,
     }, ...prev])
     setOrderSuccess({
-      id: newOrder.id,
+      id: savedOrderId,
       items: resolvedItems,
-      pickupDate: newOrder.pickup_date,
+      pickupDate: savedPickupDate,
       includeSample,
       totalCents,
     })
@@ -640,6 +663,14 @@ function App() {
             </div>
           </div>
 
+          {countdown && (
+            <div className="site-cutoff-banner" onClick={() => navigateTo('preorder')}>
+              <span className="site-cutoff-banner-label">This Sunday's order cutoff</span>
+              <span className="site-cutoff-banner-timer">{countdown}</span>
+              <span className="site-cutoff-banner-cta">Order now →</span>
+            </div>
+          )}
+
           {/* Home */}
           <section className={`hero${currentPage === 'home' ? '' : ' is-hidden'}`}>
             <div>
@@ -807,14 +838,19 @@ function App() {
                 <div className="cart-summary-heading">
                   <h2 className="cart-summary-title">Cart</h2>
                 </div>
-                {countdown && (
-                  <div className="cart-cutoff-pill">
-                    <span className="cart-cutoff-label">Order cutoff</span>
-                    <span className="cart-cutoff-timer">{countdown}</span>
-                  </div>
-                )}
                 {cartItems.length === 0 ? (
-                  <p className="cart-empty">Your cart is empty.</p>
+                  <div className="cart-empty-state">
+                    <div className="cart-empty-icon">🧺</div>
+                    <p className="cart-empty-title">Your basket is empty</p>
+                    <p className="cart-empty-sub">Pick a loaf to get started!</p>
+                    <button
+                      type="button"
+                      className="btn-fill-basket"
+                      onClick={() => navigateTo('loaves')}
+                    >
+                      Fill up your Basket
+                    </button>
+                  </div>
                 ) : (
                   <ul className="cart-items cart-items--simple">
                     {cartItems.map((item) => {
@@ -857,6 +893,21 @@ function App() {
                     })}
                   </ul>
                 )}
+                <div className="cart-sample-wrap">
+                  {!includeSample && (
+                    <p className="cart-sample-hint">Add items to your order and get a free sample on us!</p>
+                  )}
+                  <button
+                    type="button"
+                    className={`btn-sample${includeSample ? ' btn-sample--active' : ''}`}
+                    onClick={() => setIncludeSample((prev) => !prev)}
+                    disabled={cartItems.length === 0}
+                  >
+                    {includeSample ? 'Free sample added ✓' : 'Add free sample'}
+                  </button>
+                  {includeSample && <p className="cart-sample-beneath">+ Free sample loaf included with your order!</p>}
+                </div>
+
                 {/* Pickup window */}
                 <div className="cart-pickup-wrap">
                   <div className="cart-pickup-label">Choose Your Pickup Date</div>
@@ -882,22 +933,12 @@ function App() {
                       })}
                     </div>
                   )}
+                  <div className="cart-pickup-location">
+                    <span className="cart-pickup-location-label">Pickup location</span>
+                    <span className="cart-pickup-location-addr">📍 {PICKUP_ADDRESS}</span>
+                  </div>
                 </div>
 
-                <div className="cart-sample-wrap">
-                  {!includeSample && (
-                    <p className="cart-sample-hint">Add items to your order and get a free sample on us!</p>
-                  )}
-                  <button
-                    type="button"
-                    className={`btn-sample${includeSample ? ' btn-sample--active' : ''}`}
-                    onClick={() => setIncludeSample((prev) => !prev)}
-                    disabled={cartItems.length === 0}
-                  >
-                    {includeSample ? 'Free sample added ✓' : 'Add free sample'}
-                  </button>
-                  {includeSample && <p className="cart-sample-beneath">+ Free sample loaf included with your order!</p>}
-                </div>
                 <div className="cart-actions">
                   {!authUser && cartItems.length > 0 && (
                     <p className="cart-auth-notice">
