@@ -57,6 +57,14 @@ function getNextCutoff() {
 
 function formatCountdown(ms) {
   if (ms <= 0) return null
+  const oneDay = 24 * 60 * 60 * 1000
+  if (ms > oneDay) {
+    const d = Math.floor(ms / oneDay)
+    const rem = ms % oneDay
+    const h = Math.floor(rem / (60 * 60 * 1000))
+    if (h > 0) return `${d}d ${h}h`
+    return `${d} day${d === 1 ? '' : 's'}`
+  }
   const h = Math.floor(ms / 3600000)
   const m = Math.floor((ms % 3600000) / 60000)
   const s = Math.floor((ms % 60000) / 1000)
@@ -769,6 +777,12 @@ function App() {
                 <div className="cart-summary-heading">
                   <h2 className="cart-summary-title">Cart</h2>
                 </div>
+                {countdown && (
+                  <div className="cart-cutoff-pill">
+                    <span className="cart-cutoff-label">Order cutoff</span>
+                    <span className="cart-cutoff-timer">{countdown}</span>
+                  </div>
+                )}
                 {cartItems.length === 0 ? (
                   <p className="cart-empty">Your cart is empty.</p>
                 ) : (

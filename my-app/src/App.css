@@ -2400,6 +2400,31 @@ section {
   margin-bottom: 14px;
 }
 
+.cart-cutoff-pill {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: -6px 0 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.cart-cutoff-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.cart-cutoff-timer {
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #214535;
+  letter-spacing: 0.02em;
+}
+
 .cart-summary-title {
   font-family: var(--font-heading);
   font-size: 20px;
