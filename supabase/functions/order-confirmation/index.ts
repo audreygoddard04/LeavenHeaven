@@ -5,8 +5,8 @@
 //   RESEND_API_KEY   — from resend.com (free tier: 3,000 emails / month)
 //   FROM_EMAIL       — e.g. "LeavenHeaven <orders@yourdomain.com>"
 //                      (use "onboarding@resend.dev" for testing without domain setup)
-//   PICKUP_ADDRESS   — your apartment address
-//   PICKUP_NOTES     — optional, e.g. "Ring doorbell #3, Unit 4B"
+//   PICKUP_ADDRESS   — 1083 Western Road
+//   PICKUP_NOTES     — Pickup is Sundays at 2:00 PM — look for the stand out front!
 //
 // Deploy: supabase functions deploy order-confirmation
 
