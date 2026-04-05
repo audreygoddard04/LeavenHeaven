@@ -18,9 +18,14 @@ function urlHasAuthTokens() {
   if (typeof window === 'undefined') return false
   // Implicit flow: tokens in URL hash
   if (window.location.hash.includes('access_token=')) return true
-  // PKCE flow: code in query string (email confirmation)
+  // PKCE flow: code in query string
   if (new URLSearchParams(window.location.search).get('code')) return true
   return false
+}
+
+function logAuthEvent(event, session) {
+  const email = session?.user?.email ?? '—'
+  console.log(`[auth] ${event}${email !== '—' ? ` (${email})` : ''}`)
 }
 
 export function useAuth() {
@@ -34,9 +39,13 @@ export function useAuth() {
     const waitingForTokens = urlHasAuthTokens()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
+      logAuthEvent(event, newSession)
       // Skip the INITIAL_SESSION null result while we're expecting URL tokens;
       // wait for the SIGNED_IN event that follows token processing.
-      if (waitingForTokens && event === 'INITIAL_SESSION' && !newSession) return
+      if (waitingForTokens && event === 'INITIAL_SESSION' && !newSession) {
+        console.log('[auth] waiting for token exchange, holding loading state…')
+        return
+      }
 
       setSession(newSession ?? null)
       if (newSession?.user) ensureProfile(newSession.user)

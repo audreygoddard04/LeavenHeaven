@@ -6,8 +6,120 @@ import { stripe } from '../lib/stripe.js'
 export const billingRouter = Router()
 const WEEKLY_LOAF_PRICE_ID = process.env.STRIPE_WEEKLY_LOAF_PRICE_ID ?? ''
 
+// ── One-time cart checkout ────────────────────────────────────────────────────
+
+interface CartLineItem {
+  productId: string
+  name: string
+  size: string       // 'loaf' | 'mini' | 'sandwich'
+  quantity: number
+  unitPrice: number  // dollars, e.g. 12
+}
+
+billingRouter.post('/create-checkout', requireUser, async (req, res) => {
+  const user = (req as unknown as { user: { id: string; email: string; name: string } }).user
+
+  if (!stripe || !supabase) {
+    res.status(500).json({ error: 'Billing not configured' })
+    return
+  }
+
+  const { cartItems, pickupDate, includeSample } = req.body as {
+    cartItems: CartLineItem[]
+    pickupDate: string
+    includeSample: boolean
+  }
+
+  if (!cartItems?.length || !pickupDate) {
+    res.status(400).json({ error: 'Missing cart items or pickup date' })
+    return
+  }
+
+  try {
+    const orderId = crypto.randomUUID()
+    const totalCents = cartItems.reduce(
+      (sum, item) => sum + Math.round(item.unitPrice * 100) * item.quantity,
+      0
+    )
+
+    const lineItems = cartItems.map((item) => ({
+      price_data: {
+        currency: 'cad',
+        product_data: {
+          name: `${item.size === 'mini' ? 'Mini ' : item.size === 'sandwich' ? 'Sandwich ' : ''}${item.name} Loaf`,
+        },
+        unit_amount: Math.round(item.unitPrice * 100),
+      },
+      quantity: item.quantity,
+    }))
+
+    if (includeSample) {
+      lineItems.push({
+        price_data: {
+          currency: 'cad',
+          product_data: { name: 'Free Sample Loaf 🎁' },
+          unit_amount: 0,
+        },
+        quantity: 1,
+      })
+    }
+
+    const clientOrigin = process.env.CLIENT_ORIGIN ?? 'http://localhost:5173'
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      line_items: lineItems,
+      customer_email: user.email || undefined,
+      success_url: `${clientOrigin}/?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${clientOrigin}/?payment=canceled`,
+      metadata: {
+        order_id: orderId,
+        user_id: user.id,
+        pickup_date: pickupDate,
+        include_sample: String(!!includeSample),
+        customer_email: user.email,
+        customer_name: user.name,
+        total_cents: String(totalCents),
+      },
+    })
+
+    // Save a pending order so the webhook can update it on payment completion.
+    // Gracefully skip columns that might not exist in older schema versions.
+    const baseRow = {
+      id: orderId,
+      user_id: user.id,
+      status: 'pending_payment',
+      total_cents: totalCents,
+      pickup_date: pickupDate,
+      items: {
+        lines: cartItems.map(({ productId, name, size, quantity }) => ({ productId, name, size, quantity })),
+        includeSample: !!includeSample,
+      },
+    }
+
+    let { error: dbError } = await supabase.from('orders').insert({
+      ...baseRow,
+      stripe_checkout_session_id: session.id,
+    })
+
+    if (dbError && /stripe_checkout_session_id|schema cache/i.test(dbError.message ?? '')) {
+      // Column doesn't exist yet — save without it (run migration 012 to fix)
+      ;({ error: dbError } = await supabase.from('orders').insert(baseRow))
+    }
+
+    if (dbError) {
+      // Log but don't block — the webhook will upsert the order on payment success
+      console.error('[create-checkout] failed to save pending order:', dbError.message)
+    }
+
+    res.json({ checkoutUrl: session.url })
+  } catch (err) {
+    console.error('[create-checkout] error:', err)
+    res.status(500).json({ error: 'Failed to create checkout session' })
+  }
+})
+
 billingRouter.post('/create-subscription', requireUser, async (req, res) => {
-  const user = (req as { user: { id: string } }).user
+  const user = (req as unknown as { user: { id: string } }).user
 
   if (!supabase || !stripe || !WEEKLY_LOAF_PRICE_ID) {
     res.status(500).json({ error: 'Billing not configured' })
@@ -51,7 +163,7 @@ billingRouter.post('/create-subscription', requireUser, async (req, res) => {
 })
 
 billingRouter.post('/setup-intent', requireUser, async (req, res) => {
-  const user = (req as { user: { id: string } }).user
+  const user = (req as unknown as { user: { id: string } }).user
 
   if (!supabase || !stripe) {
     res.status(500).json({ error: 'Billing not configured' })
@@ -91,7 +203,7 @@ billingRouter.post('/setup-intent', requireUser, async (req, res) => {
 })
 
 billingRouter.get('/payment-methods', requireUser, async (req, res) => {
-  const user = (req as { user: { id: string } }).user
+  const user = (req as unknown as { user: { id: string } }).user
 
   if (!supabase || !stripe) {
     res.status(500).json({ error: 'Billing not configured' })

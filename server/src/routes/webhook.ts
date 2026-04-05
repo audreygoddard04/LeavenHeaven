@@ -89,11 +89,90 @@ webhookRouter.post('/', async (req: Request, res: Response) => {
         break
       }
 
+      case 'checkout.session.completed': {
+        const session = event.data.object as Stripe.Checkout.Session
+        const meta = session.metadata ?? {}
+        const orderId = meta.order_id
+        const userId = meta.user_id
+        const pickupDate = meta.pickup_date
+        const includeSample = meta.include_sample === 'true'
+        const customerEmail = meta.customer_email ?? session.customer_email ?? ''
+        const customerName = meta.customer_name ?? ''
+        const totalCents = parseInt(meta.total_cents ?? '0', 10)
+
+        if (!orderId || !userId) break
+
+        // Update the pending order to paid
+        const { data: existingOrder } = await supabase
+          .from('orders')
+          .select('id, items')
+          .eq('id', orderId)
+          .maybeSingle()
+
+        if (existingOrder) {
+          await supabase
+            .from('orders')
+            .update({ status: 'paid' })
+            .eq('id', orderId)
+        } else {
+          // Order wasn't saved during checkout creation (schema issue) — insert now
+          await supabase.from('orders').insert({
+            id: orderId,
+            user_id: userId,
+            status: 'paid',
+            total_cents: totalCents,
+            pickup_date: pickupDate,
+            stripe_checkout_session_id: session.id,
+            items: { lines: [], includeSample },
+          })
+        }
+
+        // Trigger confirmation email via Supabase Edge Function
+        if (customerEmail) {
+          const supabaseUrl = process.env.SUPABASE_URL ?? ''
+          const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
+          const fnUrl = `${supabaseUrl}/functions/v1/order-confirmation`
+
+          // Reconstruct items from the saved order or session line items
+          const savedItems: Array<{ name: string; size: string; quantity: number }> =
+            existingOrder?.items?.lines?.map((l: { name: string; size: string; quantity: number }) => ({
+              name: l.name,
+              size: l.size,
+              quantity: l.quantity,
+            })) ?? []
+
+          fetch(fnUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${serviceKey}`,
+            },
+            body: JSON.stringify({
+              to: customerEmail,
+              customerName: customerName || 'there',
+              items: savedItems,
+              pickupDate,
+              includeSample,
+              totalCents,
+            }),
+          })
+            .then((r) => r.json())
+            .then((d) => console.log('[webhook] email sent:', d?.id ?? d))
+            .catch((e) => console.warn('[webhook] email failed:', e))
+        }
+        break
+      }
+
       case 'payment_intent.succeeded': {
         const pi = event.data.object as Stripe.PaymentIntent
         const orderId = pi.metadata?.order_id
         if (orderId && supabase) {
-          await supabase.from('orders').update({ status: 'paid' }).eq('id', orderId)
+          // Only update if not already paid via checkout.session.completed
+          await supabase
+            .from('orders')
+            .update({ status: 'paid' })
+            .eq('id', orderId)
+            .neq('status', 'paid')
         }
         break
       }

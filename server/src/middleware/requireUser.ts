@@ -29,6 +29,10 @@ export async function requireUser(req: Request, res: Response, next: NextFunctio
     return
   }
 
-  ;(req as Request & { user: { id: string } }).user = { id: user.id }
+  ;(req as Request & { user: { id: string; email: string; name: string } }).user = {
+    id: user.id,
+    email: user.email ?? '',
+    name: (user.user_metadata?.full_name ?? user.user_metadata?.name ?? '') as string,
+  }
   next()
 }

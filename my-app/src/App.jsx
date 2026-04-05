@@ -88,6 +88,11 @@ function getLotwWeekId() {
 // ── Pickup location ── update VITE_PICKUP_ADDRESS in your .env.local ─────────
 const PICKUP_ADDRESS = import.meta.env.VITE_PICKUP_ADDRESS ?? 'Address TBA — check your email'
 const PICKUP_NOTES   = import.meta.env.VITE_PICKUP_NOTES   ?? ''
+
+// ── Backend API (Express server with Stripe) ──────────────────────────────────
+// Set VITE_API_URL in .env.local to enable Stripe checkout (e.g. http://localhost:3001).
+// If unset, the app falls back to saving orders directly in Supabase.
+const API_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '')
 // ─────────────────────────────────────────────────────────────────────────────
 
 function getUserDisplay(authUser) {
@@ -189,26 +194,60 @@ function App() {
     const params = new URLSearchParams(window.location.search)
     if (params.get('next') === 'account') {
       setCurrentPage('account')
-      window.location.hash = 'account'
-      // Remove ?next so reloads don't redirect again
-      const clean = window.location.pathname
-      window.history.replaceState(null, '', clean + '#account')
+      // If the URL also carries a Supabase PKCE code, leave the URL alone so
+      // supabase-js can complete the code exchange before we clean up.
+      // Supabase will clear the URL itself once the session is established.
+      if (!params.get('code')) {
+        const clean = window.location.pathname
+        window.history.replaceState(null, '', clean + '#account')
+      }
     }
   }, [])
 
-  // Only redirect to account after an OAuth or email-confirmation callback
-  // (URL will contain access_token= or ?code=). A plain reload should keep
-  // the user on whatever page the hash says.
+  // Handle return from Stripe checkout
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const payment = params.get('payment')
+    if (payment === 'success') {
+      // Clear cart and show success state
+      clearCart()
+      setOrderSuccess({ stripeRedirect: true })
+      navigateTo('preorder')
+      window.history.replaceState(null, '', window.location.pathname + '#preorder')
+    } else if (payment === 'canceled') {
+      setOrderError('Payment was canceled. Your cart has been kept — try again when you\'re ready.')
+      navigateTo('preorder')
+      window.history.replaceState(null, '', window.location.pathname + '#preorder')
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Navigate to the intended page after a successful sign-in.
+  // Covers Google OAuth (sessionStorage flag), email magic-link (?next=account),
+  // and any implicit-flow callback that leaves access_token in the hash.
   useEffect(() => {
     if (!authUser) return
-    const hashStr = window.location.hash
-    const searchStr = window.location.search
+
+    // Google OAuth sets this before redirecting; read + clear it on return.
+    let postAuthPage = null
+    try {
+      postAuthPage = sessionStorage.getItem('lh_post_auth')
+      if (postAuthPage) sessionStorage.removeItem('lh_post_auth')
+    } catch { /* ignore */ }
+
+    if (postAuthPage) {
+      setCurrentPage(postAuthPage)
+      window.history.replaceState(null, '', window.location.pathname + '#' + postAuthPage)
+      return
+    }
+
+    // Fallback: handle email magic-link / implicit-flow callbacks
     const isAuthCallback =
-      hashStr.includes('access_token=') ||
-      Boolean(new URLSearchParams(searchStr).get('code'))
+      window.location.hash.includes('access_token=') ||
+      Boolean(new URLSearchParams(window.location.search).get('code'))
     if (isAuthCallback) {
       setCurrentPage('account')
-      window.location.hash = 'account'
+      window.history.replaceState(null, '', window.location.pathname + '#account')
     }
   }, [authUser])
 
@@ -328,6 +367,56 @@ function App() {
       return
     }
     setOrderError(null)
+
+    // ── Stripe hosted checkout (requires VITE_API_URL to be set) ──────────────
+    if (API_URL) {
+      try {
+        const { data: { session: authSession } } = await supabase.auth.getSession()
+        const token = authSession?.access_token
+        if (!token) { navigateTo('account'); return }
+
+        const pickupIso = pickupDate.toISOString().split('T')[0]
+        const cartLineItems = cartItems.map((item) => {
+          const isCustom = item.productId === 'custom'
+          const product = !isCustom ? loafProducts.find((p) => p.id === item.productId) : null
+          const unitPrice = isCustom
+            ? (item.custom?.unitPrice ?? 0)
+            : (item.size === 'mini' ? MINI_LOAF_PRICE : getLoafPriceForProduct(product))
+          return {
+            productId: item.productId,
+            name: isCustom ? 'Custom Loaf' : (product?.name ?? item.productId),
+            size: item.size,
+            quantity: item.quantity,
+            unitPrice,
+          }
+        })
+
+        const resp = await fetch(`${API_URL}/api/billing/create-checkout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ cartItems: cartLineItems, pickupDate: pickupIso, includeSample }),
+        })
+
+        const json = await resp.json()
+        if (!resp.ok || !json.checkoutUrl) {
+          setOrderError(json.error ?? 'Could not start checkout. Please try again.')
+          return
+        }
+
+        // Redirect to Stripe — on success Stripe returns to /?payment=success
+        window.location.href = json.checkoutUrl
+        return
+      } catch (err) {
+        console.error('[placePreorder] stripe checkout error:', err)
+        setOrderError('Could not reach the payment server. Please try again.')
+        return
+      }
+    }
+
+    // ── Fallback: save order directly in Supabase (no Stripe) ─────────────────
     try {
       await _placePreorder()
     } catch (err) {
@@ -582,12 +671,23 @@ function App() {
   }
 
   const signInGoogle = async () => {
-    await supabase.auth.signInWithOAuth({
+    // Store intent so we navigate to account after the OAuth redirect completes.
+    // Using sessionStorage survives same-tab redirects but clears on tab close.
+    try { sessionStorage.setItem('lh_post_auth', 'account') } catch { /* ignore */ }
+
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/?next=account` : undefined,
+        // Redirect back to the app root — supabase appends ?code= for PKCE exchange.
+        // Keeping it clean avoids any redirect-URL allowlist mismatches in Supabase.
+        redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
       },
     })
+    if (error) {
+      try { sessionStorage.removeItem('lh_post_auth') } catch { /* ignore */ }
+      console.error('[auth] signInWithOAuth error:', error.message)
+      setAuthMessage('Google sign-in failed. Please try again.')
+    }
   }
 
   return (
@@ -794,11 +894,24 @@ function App() {
                 {orderSuccess ? (
                   <div className="order-confirm">
                     <div className="order-confirm-check">✓</div>
-                    <div className="order-confirm-title">Order placed!</div>
+                    <div className="order-confirm-title">
+                      {orderSuccess.stripeRedirect ? 'Payment confirmed!' : 'Order placed!'}
+                    </div>
 
+                    {orderSuccess.stripeRedirect ? (
+                      <div className="order-confirm-section">
+                        <p className="order-confirm-stripe-msg">
+                          Your payment was successful and your order has been placed.
+                          A confirmation email is on its way!
+                        </p>
+                        <div className="order-confirm-pickup-addr" style={{ marginTop: 8 }}>📍 {PICKUP_ADDRESS}</div>
+                        {PICKUP_NOTES && <div className="order-confirm-pickup-notes">{PICKUP_NOTES}</div>}
+                      </div>
+                    ) : (
+                    <>
                     <div className="order-confirm-section">
                       <div className="order-confirm-label">Your items</div>
-                      {orderSuccess.items.map((item, i) => (
+                      {orderSuccess.items?.map((item, i) => (
                         <div key={i} className="order-confirm-item">
                           {item.quantity}× {item.name}
                           <span className="order-confirm-item-size">{item.size === 'mini' ? ' (Mini)' : ''}</span>
@@ -813,7 +926,7 @@ function App() {
                       <div className="order-confirm-label">Pickup</div>
                       <div className="order-confirm-pickup-date">
                         📅{' '}
-                        {new Date(orderSuccess.pickupDate + 'T12:00:00').toLocaleDateString('en-US', {
+                        {new Date((orderSuccess.pickupDate ?? '') + 'T12:00:00').toLocaleDateString('en-US', {
                           weekday: 'long', month: 'long', day: 'numeric',
                         })}
                       </div>
@@ -825,6 +938,8 @@ function App() {
                       <p className="order-confirm-email">
                         A confirmation email is on its way to <strong>{authUser.email}</strong>.
                       </p>
+                    )}
+                    </>
                     )}
 
                     <button
