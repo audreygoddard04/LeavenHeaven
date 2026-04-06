@@ -4,51 +4,58 @@ import Stripe from "https://esm.sh/stripe@14.25.0"
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 }
 
 Deno.serve(async (req) => {
-  // 1. Handle CORS Preflight
+  // 1. Handle CORS
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders })
   }
 
+  console.log(`[create-stripe-checkout] Request received: ${req.method}`)
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? ""
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? ""
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     
-    // 2. Initialize Stripe
+    // Initialize Stripe
     const stripeSecret = Deno.env.get("STRIPE_SECRET_KEY")
     if (!stripeSecret) throw new Error("STRIPE_SECRET_KEY is not set")
     const stripe = new Stripe(stripeSecret, { apiVersion: "2023-10-16" })
 
-    // 3. Authenticate User
+    // 2. Authenticate User
     const authHeader = req.headers.get("Authorization")
-    if (!authHeader) throw new Error("No authorization header")
-
-    // We use the Service Role client to verify the token and get the user
-    // This is more robust in Edge Functions where the gateway might have already verified the token
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
-    
-    // Extract token from "Bearer <token>"
-    const token = authHeader.replace("Bearer ", "")
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token)
-    
-    if (userError || !user) {
-      console.error("[create-stripe-checkout] auth error:", userError)
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+    if (!authHeader) {
+      console.error("[create-stripe-checkout] Missing Authorization header")
+      return new Response(JSON.stringify({ error: "No authorization header provided" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 401,
       })
     }
 
-    // 4. Parse request body
-    const { cartItems, pickupDate, includeSample } = await req.json()
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+    const token = authHeader.replace("Bearer ", "")
+    
+    // We use service role to verify the token sent by the user
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token)
+    
+    if (userError || !user) {
+      console.error("[create-stripe-checkout] Auth verification failed:", userError?.message || "User not found")
+      return new Response(JSON.stringify({ error: "Invalid or expired token" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      })
+    }
+
+    console.log(`[create-stripe-checkout] Authenticated user: ${user.id} (${user.email})`)
+
+    // 3. Parse request body
+    const body = await req.json()
+    const { cartItems, pickupDate, includeSample } = body
     if (!cartItems || !Array.isArray(cartItems)) throw new Error("cartItems is required")
 
-    console.log(`[create-stripe-checkout] session for user=${user.id} email=${user.email}`)
-
-    // 5. Create Stripe Checkout Session
+    // 4. Create Stripe Checkout Session
     const lineItems = cartItems.map((item: any) => ({
       price_data: {
         currency: "usd",
@@ -77,9 +84,11 @@ Deno.serve(async (req) => {
       },
     })
 
-    // 6. Save order
+    console.log(`[create-stripe-checkout] Stripe session created: ${session.id}`)
+
+    // 5. Save order
     const totalCents = cartItems.reduce((sum: number, item: any) => sum + Math.round(item.unitPrice * 100) * item.quantity, 0)
-    await supabaseAdmin.from("orders").insert({
+    const { error: insertError } = await supabaseAdmin.from("orders").insert({
       user_id: user.id,
       status: "pending_payment",
       total_cents: totalCents,
@@ -89,12 +98,17 @@ Deno.serve(async (req) => {
       include_sample: includeSample,
     })
 
+    if (insertError) {
+      console.warn("[create-stripe-checkout] Order record not created:", insertError.message)
+      // We still proceed since the webhook can backfill it if metadata is present
+    }
+
     return new Response(JSON.stringify({ checkoutUrl: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     })
   } catch (err: any) {
-    console.error("[create-stripe-checkout] exception:", err.message)
+    console.error("[create-stripe-checkout] Server error:", err.message)
     return new Response(JSON.stringify({ error: err.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 400,
