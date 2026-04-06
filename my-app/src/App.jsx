@@ -386,8 +386,18 @@ function App() {
         }
       })
 
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        navigateTo('account')
+        setAuthMessage('Please sign in to place a pre-order.')
+        return
+      }
+
       const { data, error } = await supabase.functions.invoke('create-stripe-checkout', {
         body: { cartItems: cartLineItems, pickupDate: pickupIso, includeSample },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       })
 
       if (error || !data?.checkoutUrl) {
