@@ -1,13 +1,12 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
-import Stripe from "https://esm.sh/stripe@14.25.0?target=deno"
+import Stripe from "https://esm.sh/stripe@14.25.0"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   // 1. Handle CORS Preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders })
@@ -18,8 +17,7 @@ serve(async (req) => {
     const stripeSecret = Deno.env.get("STRIPE_SECRET_KEY")
     if (!stripeSecret) throw new Error("STRIPE_SECRET_KEY is not set")
     const stripe = new Stripe(stripeSecret, {
-      apiVersion: "2022-11-15",
-      httpClient: Stripe.createFetchHttpClient(),
+      apiVersion: "2023-10-16",
     })
 
     // 3. Get user from Auth Header
@@ -27,17 +25,25 @@ serve(async (req) => {
     if (!authHeader) throw new Error("No authorization header")
     
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? ""
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? ""
-    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    
+    const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
       global: { headers: { Authorization: authHeader } }
     })
 
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
-    if (userError || !user) throw new Error("Unauthorized: " + (userError?.message ?? "User not found"))
+    const { data: { user }, error: userError } = await userClient.auth.getUser()
+    if (userError || !user) {
+      console.error("[create-stripe-checkout] auth error:", userError)
+      throw new Error("Unauthorized")
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
 
     // 4. Parse request body
     const { cartItems, pickupDate, includeSample } = await req.json()
     if (!cartItems || !Array.isArray(cartItems)) throw new Error("cartItems is required")
+
+    console.log(`[create-stripe-checkout] creating session for user=${user.id}`)
 
     // 5. Create Stripe Checkout Session
     const lineItems = cartItems.map((item: any) => ({
@@ -72,7 +78,6 @@ serve(async (req) => {
     })
 
     // 6. Save order as 'pending_payment' in Supabase
-    // We do this BEFORE redirecting so we have a record if the session expires
     const totalCents = cartItems.reduce((sum: number, item: any) => {
       return sum + Math.round(item.unitPrice * 100) * item.quantity
     }, 0)
@@ -91,8 +96,6 @@ serve(async (req) => {
 
     if (orderError) {
       console.error("[create-stripe-checkout] order insert error:", orderError)
-      // We still return the checkoutUrl even if order saving failed (unlikely),
-      // as the webhook can backfill the order if needed.
     }
 
     return new Response(JSON.stringify({ checkoutUrl: session.url }), {
