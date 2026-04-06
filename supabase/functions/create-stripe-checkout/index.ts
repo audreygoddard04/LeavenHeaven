@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
-import Stripe from "https://esm.sh/stripe@12.18.0?target=deno&no-check=true"
+import Stripe from "https://esm.sh/stripe@14.25.0?target=deno"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -77,7 +77,7 @@ serve(async (req) => {
       return sum + Math.round(item.unitPrice * 100) * item.quantity
     }, 0)
 
-    const { error: orderError } = await supabaseClient
+    const { error: orderError } = await supabaseAdmin
       .from("orders")
       .insert({
         user_id: user.id,
