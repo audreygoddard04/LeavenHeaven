@@ -13,37 +13,40 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? ""
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    
     // 2. Initialize Stripe
     const stripeSecret = Deno.env.get("STRIPE_SECRET_KEY")
     if (!stripeSecret) throw new Error("STRIPE_SECRET_KEY is not set")
-    const stripe = new Stripe(stripeSecret, {
-      apiVersion: "2023-10-16",
-    })
+    const stripe = new Stripe(stripeSecret, { apiVersion: "2023-10-16" })
 
-    // 3. Get user from Auth Header
+    // 3. Authenticate User
     const authHeader = req.headers.get("Authorization")
     if (!authHeader) throw new Error("No authorization header")
-    
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? ""
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    
-    const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
-      global: { headers: { Authorization: authHeader } }
-    })
 
-    const { data: { user }, error: userError } = await userClient.auth.getUser()
+    // We use the Service Role client to verify the token and get the user
+    // This is more robust in Edge Functions where the gateway might have already verified the token
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+    
+    // Extract token from "Bearer <token>"
+    const token = authHeader.replace("Bearer ", "")
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token)
+    
     if (userError || !user) {
       console.error("[create-stripe-checkout] auth error:", userError)
-      throw new Error("Unauthorized")
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      })
     }
-
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
 
     // 4. Parse request body
     const { cartItems, pickupDate, includeSample } = await req.json()
     if (!cartItems || !Array.isArray(cartItems)) throw new Error("cartItems is required")
 
-    console.log(`[create-stripe-checkout] creating session for user=${user.id}`)
+    console.log(`[create-stripe-checkout] session for user=${user.id} email=${user.email}`)
 
     // 5. Create Stripe Checkout Session
     const lineItems = cartItems.map((item: any) => ({
@@ -51,10 +54,7 @@ Deno.serve(async (req) => {
         currency: "usd",
         product_data: {
           name: item.name,
-          metadata: {
-            productId: item.productId,
-            size: item.size,
-          },
+          metadata: { productId: item.productId, size: item.size },
         },
         unit_amount: Math.round(item.unitPrice * 100),
       },
@@ -73,30 +73,21 @@ Deno.serve(async (req) => {
         pickup_date: pickupDate,
         include_sample: String(includeSample),
         customer_email: user.email ?? "",
-        customer_name: user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? "",
+        customer_name: user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? "Customer",
       },
     })
 
-    // 6. Save order as 'pending_payment' in Supabase
-    const totalCents = cartItems.reduce((sum: number, item: any) => {
-      return sum + Math.round(item.unitPrice * 100) * item.quantity
-    }, 0)
-
-    const { error: orderError } = await supabaseAdmin
-      .from("orders")
-      .insert({
-        user_id: user.id,
-        status: "pending_payment",
-        total_cents: totalCents,
-        pickup_date: pickupDate,
-        items: { lines: cartItems, includeSample },
-        stripe_checkout_session_id: session.id,
-        include_sample: includeSample,
-      })
-
-    if (orderError) {
-      console.error("[create-stripe-checkout] order insert error:", orderError)
-    }
+    // 6. Save order
+    const totalCents = cartItems.reduce((sum: number, item: any) => sum + Math.round(item.unitPrice * 100) * item.quantity, 0)
+    await supabaseAdmin.from("orders").insert({
+      user_id: user.id,
+      status: "pending_payment",
+      total_cents: totalCents,
+      pickup_date: pickupDate,
+      items: { lines: cartItems, includeSample },
+      stripe_checkout_session_id: session.id,
+      include_sample: includeSample,
+    })
 
     return new Response(JSON.stringify({ checkoutUrl: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
