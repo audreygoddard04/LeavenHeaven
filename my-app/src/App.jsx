@@ -395,10 +395,6 @@ function App() {
 
       const { data, error } = await supabase.functions.invoke('create-stripe-checkout', {
         body: { cartItems: cartLineItems, pickupDate: pickupIso, includeSample },
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-        }
       })
 
       if (error || !data?.checkoutUrl) {

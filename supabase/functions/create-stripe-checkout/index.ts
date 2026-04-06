@@ -8,6 +8,7 @@ const corsHeaders = {
 }
 
 Deno.serve(async (req) => {
+  console.log(`[create-stripe-checkout] ${req.method} request received`)
   // 1. Log Headers for debugging
   const headers = Object.fromEntries(req.headers.entries())
   console.log("[create-stripe-checkout] Incoming Headers:", JSON.stringify(headers))
