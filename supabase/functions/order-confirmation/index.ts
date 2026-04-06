@@ -1,17 +1,3 @@
-// Supabase Edge Function — sends an order confirmation email via Resend.
-//
-// Required Supabase secrets (set via dashboard → Project Settings → Edge Functions,
-// or run: supabase secrets set KEY=value):
-//   RESEND_API_KEY   — from resend.com (free tier: 3,000 emails / month)
-//   FROM_EMAIL       — e.g. "LeavenHeaven <orders@yourdomain.com>"
-//                      (use "onboarding@resend.dev" for testing without domain setup)
-//   PICKUP_ADDRESS   — 1083 Western Road
-//   PICKUP_NOTES     — Pickup is Sundays at 2:00 PM — look for the stand out front!
-//
-// Deploy: supabase functions deploy order-confirmation
-
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-
 const REPLY_TO = 'audreyannagoddard@gmail.com'
 
 const cors = {
@@ -19,7 +5,7 @@ const cors = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: cors })
   }
