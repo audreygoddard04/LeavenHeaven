@@ -393,16 +393,25 @@ function App() {
         return
       }
 
-      const { data, error } = await supabase.functions.invoke('create-stripe-checkout', {
-        body: { cartItems: cartLineItems, pickupDate: pickupIso, includeSample },
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+      const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+      const FUNCTION_URL = `${SUPABASE_URL}/functions/v1/create-stripe-checkout`
+
+      const resp = await fetch(FUNCTION_URL, {
+        method: 'POST',
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': SUPABASE_ANON_KEY,
         },
+        body: JSON.stringify({ cartItems: cartLineItems, pickupDate: pickupIso, includeSample }),
       })
 
-      if (error || !data?.checkoutUrl) {
-        console.error('[placePreorder] Edge Function error:', error)
-        setOrderError(error?.message ?? data?.error ?? 'Could not start checkout. Please try again.')
+      const data = await resp.json()
+
+      if (!resp.ok || !data?.checkoutUrl) {
+        console.error('[placePreorder] Edge Function error:', data)
+        setOrderError(data?.error ?? 'Could not start checkout. Please try again.')
         return
       }
 
