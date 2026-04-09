@@ -69,6 +69,7 @@ billingRouter.post('/create-checkout', requireUser, async (req, res) => {
       mode: 'payment',
       line_items: lineItems,
       customer_email: user.email || undefined,
+      allow_promotion_codes: true,   // lets customers enter their EARLYBIRD code
       success_url: `${clientOrigin}/?payment=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${clientOrigin}/?payment=canceled`,
       metadata: {

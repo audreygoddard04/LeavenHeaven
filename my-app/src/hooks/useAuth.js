@@ -8,10 +8,43 @@ async function ensureProfile(user) {
     user.user_metadata?.name ||
     user.email?.split('@')[0] ||
     'User'
+
+  // Check whether a welcome email has already been sent before upserting,
+  // so we don't fire it on every sign-in — only on the very first one.
+  const { data: existing } = await supabase
+    .from('profiles')
+    .select('welcome_sent')
+    .eq('id', user.id)
+    .maybeSingle()
+
   const { error } = await supabase
     .from('profiles')
     .upsert({ id: user.id, display_name: displayName }, { onConflict: 'id' })
   if (error) console.error('[useAuth] profile upsert failed:', error.message)
+
+  // Send a one-time welcome email (works for both Google OAuth and email sign-up)
+  if (!existing?.welcome_sent && user.email) {
+    console.log('[useAuth] new user — sending welcome email to', user.email)
+    supabase.functions
+      .invoke('send-welcome-email', {
+        body: { to: user.email, customerName: displayName },
+      })
+      .then(({ error: fnError }) => {
+        if (fnError) {
+          console.warn('[useAuth] welcome email error:', fnError)
+          return
+        }
+        // Mark as welcomed so we never send it again
+        supabase
+          .from('profiles')
+          .update({ welcome_sent: true })
+          .eq('id', user.id)
+          .then(({ error: updateError }) => {
+            if (updateError) console.warn('[useAuth] welcome_sent update failed:', updateError.message)
+          })
+      })
+      .catch((err) => console.warn('[useAuth] welcome email exception:', err))
+  }
 }
 
 function urlHasAuthTokens() {
