@@ -3894,9 +3894,161 @@ footer {
 }
 
 .cart-promo-hint {
+  font-size: 11px;
+  color: var(--accent);
+  margin: 0;
+  letter-spacing: 0.01em;
+  background: rgba(58, 110, 80, 0.07);
+  border-radius: 99px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+/* ── Admin Page ─────────────────────────────────────────────────────────── */
+
+.admin-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 0 48px;
+}
+
+.admin-bake-summary {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+}
+
+.admin-bake-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.admin-bake-item {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 6px 14px;
+}
+
+.admin-bake-qty {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--accent);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-bake-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.admin-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.admin-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 99px;
+  flex-shrink: 0;
+}
+
+.admin-order-group {
+  margin-bottom: 28px;
+}
+
+.admin-orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-order-card {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  padding: 16px 20px;
+}
+
+.admin-order-card--completed {
+  opacity: 0.6;
+}
+
+.admin-order-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.admin-order-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.admin-order-customer {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.admin-order-date {
   font-size: 12px;
   color: var(--muted);
-  text-align: center;
-  margin: 8px 0 0;
-  letter-spacing: 0.01em;
+}
+
+.admin-order-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.admin-order-total {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.admin-order-items {
+  font-size: 13px;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.admin-order-note {
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+  margin-top: 2px;
+}
+
+.admin-order-actions {
+  margin-top: 14px;
 }

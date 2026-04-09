@@ -8,12 +8,6 @@ const corsHeaders = {
 }
 
 Deno.serve(async (req) => {
-  console.log(`[create-stripe-checkout] ${req.method} request received`)
-  // 1. Log Headers for debugging
-  const headers = Object.fromEntries(req.headers.entries())
-  console.log("[create-stripe-checkout] Incoming Headers:", JSON.stringify(headers))
-
-  // 2. Handle CORS
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders })
   }
@@ -21,16 +15,14 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? ""
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    
-    // Initialize Stripe
+
     const stripeSecret = Deno.env.get("STRIPE_SECRET_KEY")
     if (!stripeSecret) throw new Error("STRIPE_SECRET_KEY is not set")
     const stripe = new Stripe(stripeSecret, { apiVersion: "2023-10-16" })
 
-    // 3. Authenticate User
+    // Authenticate user
     const authHeader = req.headers.get("Authorization")
     if (!authHeader) {
-      console.error("[create-stripe-checkout] No Authorization header found")
       return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 401,
@@ -39,64 +31,103 @@ Deno.serve(async (req) => {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
     const token = authHeader.replace("Bearer ", "")
-    
-    // Verify the token
     const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token)
-    
+
     if (userError || !user) {
-      console.error("[create-stripe-checkout] User verification failed:", userError?.message)
       return new Response(JSON.stringify({ error: "Invalid token" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 401,
       })
     }
 
-    console.log(`[create-stripe-checkout] Verified User: ${user.id}`)
-
-    // 4. Parse request body
     const body = await req.json()
     const { cartItems, pickupDate, includeSample } = body
-    
-    // 5. Create Stripe Checkout Session
+
+    if (!cartItems?.length || !pickupDate) {
+      return new Response(JSON.stringify({ error: "Missing cart items or pickup date" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      })
+    }
+
+    const orderId = crypto.randomUUID()
+    const totalCents = cartItems.reduce(
+      (sum: number, item: any) => sum + Math.round(item.unitPrice * 100) * item.quantity,
+      0
+    )
+
+    // Build Stripe line items
     const lineItems = cartItems.map((item: any) => ({
       price_data: {
-        currency: "usd",
+        currency: "cad",
         product_data: {
-          name: item.name,
-          metadata: { productId: item.productId, size: item.size },
+          name: `${item.size === "mini" ? "Mini " : item.size === "sandwich" ? "Sandwich " : ""}${item.name} Loaf`,
         },
         unit_amount: Math.round(item.unitPrice * 100),
       },
       quantity: item.quantity,
     }))
 
+    if (includeSample) {
+      lineItems.push({
+        price_data: {
+          currency: "cad",
+          product_data: { name: "Free Sample Loaf 🎁" },
+          unit_amount: 0,
+        },
+        quantity: 1,
+      })
+    }
+
+    const clientOrigin = req.headers.get("origin") || "http://localhost:5173"
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       line_items: lineItems,
       mode: "payment",
-      success_url: `${req.headers.get("origin") || "http://localhost:5173"}/?payment=success`,
-      cancel_url: `${req.headers.get("origin") || "http://localhost:5173"}/?payment=canceled`,
+      allow_promotion_codes: true,
       customer_email: user.email,
+      success_url: `${clientOrigin}/?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${clientOrigin}/?payment=canceled`,
       metadata: {
+        order_id: orderId,
         user_id: user.id,
         pickup_date: pickupDate,
-        include_sample: String(includeSample),
+        include_sample: String(!!includeSample),
         customer_email: user.email ?? "",
-        customer_name: user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? "Customer",
+        customer_name: user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "Customer",
+        total_cents: String(totalCents),
       },
     })
 
-    // 6. Save order
-    const totalCents = cartItems.reduce((sum: number, item: any) => sum + Math.round(item.unitPrice * 100) * item.quantity, 0)
-    await supabaseAdmin.from("orders").insert({
+    // Save as pending so it appears in admin immediately
+    const baseRow = {
+      id: orderId,
       user_id: user.id,
-      status: "pending_payment",
+      status: "pending",
       total_cents: totalCents,
       pickup_date: pickupDate,
-      items: { lines: cartItems, includeSample },
+      items: {
+        lines: cartItems.map(({ productId, name, size, quantity }: any) => ({
+          productId, name, size, quantity,
+        })),
+        includeSample: !!includeSample,
+      },
+      include_sample: !!includeSample,
+    }
+
+    let { error: dbError } = await supabaseAdmin.from("orders").insert({
+      ...baseRow,
       stripe_checkout_session_id: session.id,
-      include_sample: includeSample,
     })
+
+    if (dbError && /stripe_checkout_session_id|schema cache/i.test(dbError.message ?? "")) {
+      ;({ error: dbError } = await supabaseAdmin.from("orders").insert(baseRow))
+    }
+
+    if (dbError) {
+      console.error("[create-stripe-checkout] failed to save order:", dbError.message)
+    }
 
     return new Response(JSON.stringify({ checkoutUrl: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

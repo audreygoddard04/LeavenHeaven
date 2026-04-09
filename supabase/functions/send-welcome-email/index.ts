@@ -45,14 +45,14 @@ Deno.serve(async (req) => {
         <tr><td style="padding:32px 40px 0;text-align:center;">
           <div style="display:inline-block;background:#e8f2ec;color:#214535;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;padding:6px 16px;border-radius:999px;">Welcome to the family 🌾</div>
           <h2 style="font-size:24px;margin:16px 0 8px;color:#214535;">Hi ${name}, you're in!</h2>
-          <p style="font-size:15px;color:#555;margin:0 0 28px;line-height:1.6;">Thanks for joining Leaven Heaven — a small-batch, macro-friendly sourdough bakery baking with purpose, passion, and a serious love of good bread.</p>
+          <p style="font-size:15px;color:#555;margin:0 0 28px;line-height:1.6;">We're glad you joining Leaven Heaven; your local sourdough community where we are baking with purpose, passion, and a love of good bread.</p>
         </td></tr>
 
         <!-- About section -->
         <tr><td style="padding:0 40px 24px;">
           <div style="background:#f5f0e8;border-radius:10px;padding:24px;">
             <div style="font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#888;margin-bottom:14px;">What we're about</div>
-            <p style="font-size:14px;color:#444;line-height:1.7;margin:0 0 12px;">Every loaf is made with high-quality, whole-grain ingredients and packed with protein — so you can enjoy real, delicious bread without compromising your goals.</p>
+            <p style="font-size:14px;color:#444;line-height:1.7;margin:0 0 12px;">Every loaf is made with high-quality, fresh ingredients with the option to be packed with protein so you can enjoy real bread!!!</p>
             <p style="font-size:14px;color:#444;line-height:1.7;margin:0;">We do <strong>weekly pre-orders</strong>, baked fresh and ready for Sunday pickup at <strong>1083 Western Road</strong> at 2:00 PM. Orders close every Thursday at midnight.</p>
           </div>
         </td></tr>
@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
             <div style="font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#214535;margin-bottom:12px;">🎁 Early Member Gift</div>
             <p style="font-size:14px;color:#555;margin:0 0 16px;line-height:1.5;">As one of our first members, you get a special discount on your order. Use this code at checkout:</p>
             <div style="display:inline-block;background:#214535;color:#fdfaf7;font-size:22px;font-weight:700;letter-spacing:0.18em;padding:12px 28px;border-radius:8px;font-family:monospace;">${PROMO_CODE}</div>
-            <p style="font-size:12px;color:#999;margin:12px 0 0;">Apply at checkout — thank you for being here from the beginning 🙏</p>
+            <p style="font-size:12px;color:#999;margin:12px 0 0;">Apply at checkout :)</p>
           </div>
         </td></tr>
 

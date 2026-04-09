@@ -368,55 +368,67 @@ function App() {
     }
     setOrderError(null)
 
-    // ── Stripe hosted checkout (requires VITE_API_URL in .env.local) ──────────
+    const pickupIso = pickupDate.toISOString().split('T')[0]
+    const cartLineItems = cartItems.map((item) => {
+      const isCustom = item.productId === 'custom'
+      const product = !isCustom ? loafProducts.find((p) => p.id === item.productId) : null
+      const unitPrice = isCustom
+        ? (item.custom?.unitPrice ?? 0)
+        : (item.size === 'mini' ? MINI_LOAF_PRICE : getLoafPriceForProduct(product))
+      return {
+        productId: item.productId,
+        name: isCustom ? 'Custom Loaf' : (product?.name ?? item.productId),
+        size: item.size,
+        quantity: item.quantity,
+        unitPrice,
+      }
+    })
+
+    const { data: { session: authSession } } = await supabase.auth.getSession()
+    const token = authSession?.access_token
+    if (!token) { navigateTo('account'); return }
+
+    // ── Try Express server first (if VITE_API_URL set), then Edge Function ──
     if (API_URL) {
       try {
-        const pickupIso = pickupDate.toISOString().split('T')[0]
-        const cartLineItems = cartItems.map((item) => {
-          const isCustom = item.productId === 'custom'
-          const product = !isCustom ? loafProducts.find((p) => p.id === item.productId) : null
-          const unitPrice = isCustom
-            ? (item.custom?.unitPrice ?? 0)
-            : (item.size === 'mini' ? MINI_LOAF_PRICE : getLoafPriceForProduct(product))
-          return {
-            productId: item.productId,
-            name: isCustom ? 'Custom Loaf' : (product?.name ?? item.productId),
-            size: item.size,
-            quantity: item.quantity,
-            unitPrice,
-          }
-        })
-
-        const { data: { session: authSession } } = await supabase.auth.getSession()
-        const token = authSession?.access_token
-        if (!token) { navigateTo('account'); return }
-
         const resp = await fetch(`${API_URL}/api/billing/create-checkout`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ cartItems: cartLineItems, pickupDate: pickupIso, includeSample }),
         })
-
         const json = await resp.json()
         if (!resp.ok || !json.checkoutUrl) {
           setOrderError(json.error ?? 'Could not start checkout. Please try again.')
           return
         }
-
-        // Redirect to Stripe — on success Stripe returns to /?payment=success
         window.location.href = json.checkoutUrl
         return
       } catch (err) {
-        console.error('[placePreorder] stripe checkout error:', err)
+        console.error('[placePreorder] express server error:', err)
         setOrderError('Could not reach the payment server. Please try again.')
         return
       }
     }
 
-    // ── Direct Supabase save (no Stripe) ────────────────────────────────────
+    // ── Supabase Edge Function (create-stripe-checkout) ──────────────────────
+    try {
+      const { data: edgeData, error: edgeError } = await supabase.functions.invoke(
+        'create-stripe-checkout',
+        { body: { cartItems: cartLineItems, pickupDate: pickupIso, includeSample } },
+      )
+      if (!edgeError && edgeData?.checkoutUrl) {
+        window.location.href = edgeData.checkoutUrl
+        return
+      }
+      // If Stripe isn't configured on the Edge Function, fall through to direct save
+      if (edgeError && !/stripe/i.test(edgeError.message ?? '')) {
+        console.warn('[placePreorder] edge function unavailable, saving directly:', edgeError.message)
+      }
+    } catch (err) {
+      console.warn('[placePreorder] edge function error, falling back:', err)
+    }
+
+    // ── Direct Supabase save (fallback when Stripe is not configured) ────────
     try {
       await _placePreorder()
     } catch (err) {
@@ -1063,14 +1075,14 @@ function App() {
                     </p>
                   )}
                   {orderError && <p className="cart-order-error">{orderError}</p>}
+                  {cartItems.length > 0 && (
+                    <p className="cart-promo-hint">
+                      🏷️ Have a promo code? Enter it on the next step.
+                    </p>
+                  )}
                   <button type="button" className="btn-small" onClick={placePreorder} disabled={cartItems.length === 0 || !pickupDate}>
                     Place pre-order
                   </button>
-                  {cartItems.length > 0 && (
-                    <p className="cart-promo-hint">
-                      🏷️ Have a promo code? Enter it on the next step at checkout.
-                    </p>
-                  )}
                 </div>
                 </>
                 )}

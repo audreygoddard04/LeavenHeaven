@@ -40,7 +40,13 @@ function formatPickupDate(dateStr) {
   })
 }
 
-function itemSummary(items) {
+function itemSummary(rawItems) {
+  // Support both plain array and { lines: [], includeSample } object formats
+  const items = Array.isArray(rawItems)
+    ? rawItems
+    : Array.isArray(rawItems?.lines)
+      ? rawItems.lines
+      : []
   return items.map((item) => {
     if (item.productId === 'custom') {
       const c = item.custom
