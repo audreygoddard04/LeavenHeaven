@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
 
   const RESEND_API_KEY  = Deno.env.get('RESEND_API_KEY')  ?? ''
   const FROM_EMAIL      = Deno.env.get('FROM_EMAIL')      ?? 'LeavenHeaven <orders@leavenheaven.shop>'
-  const PROMO_CODE      = Deno.env.get('WELCOME_PROMO_CODE') ?? 'EARLYBIRD'
+  const PROMO_CODE      = Deno.env.get('WELCOME_PROMO_CODE') ?? 'FIRSTRISE'
   const SITE_URL        = Deno.env.get('SITE_URL')        ?? 'https://leavenheaven.shop'
 
   try {

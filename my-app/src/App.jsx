@@ -1066,6 +1066,11 @@ function App() {
                   <button type="button" className="btn-small" onClick={placePreorder} disabled={cartItems.length === 0 || !pickupDate}>
                     Place pre-order
                   </button>
+                  {cartItems.length > 0 && (
+                    <p className="cart-promo-hint">
+                      🏷️ Have a promo code? Enter it on the next step at checkout.
+                    </p>
+                  )}
                 </div>
                 </>
                 )}
