@@ -368,52 +368,63 @@ function App() {
     }
     setOrderError(null)
 
-    // ── Stripe hosted checkout (via Supabase Edge Function) ──────────────────
-    try {
-      const pickupIso = pickupDate.toISOString().split('T')[0]
-      const cartLineItems = cartItems.map((item) => {
-        const isCustom = item.productId === 'custom'
-        const product = !isCustom ? loafProducts.find((p) => p.id === item.productId) : null
-        const unitPrice = isCustom
-          ? (item.custom?.unitPrice ?? 0)
-          : (item.size === 'mini' ? MINI_LOAF_PRICE : getLoafPriceForProduct(product))
-        return {
-          productId: item.productId,
-          name: isCustom ? 'Custom Loaf' : (product?.name ?? item.productId),
-          size: item.size,
-          quantity: item.quantity,
-          unitPrice,
+    // ── Stripe hosted checkout (requires VITE_API_URL in .env.local) ──────────
+    if (API_URL) {
+      try {
+        const pickupIso = pickupDate.toISOString().split('T')[0]
+        const cartLineItems = cartItems.map((item) => {
+          const isCustom = item.productId === 'custom'
+          const product = !isCustom ? loafProducts.find((p) => p.id === item.productId) : null
+          const unitPrice = isCustom
+            ? (item.custom?.unitPrice ?? 0)
+            : (item.size === 'mini' ? MINI_LOAF_PRICE : getLoafPriceForProduct(product))
+          return {
+            productId: item.productId,
+            name: isCustom ? 'Custom Loaf' : (product?.name ?? item.productId),
+            size: item.size,
+            quantity: item.quantity,
+            unitPrice,
+          }
+        })
+
+        const { data: { session: authSession } } = await supabase.auth.getSession()
+        const token = authSession?.access_token
+        if (!token) { navigateTo('account'); return }
+
+        const resp = await fetch(`${API_URL}/api/billing/create-checkout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ cartItems: cartLineItems, pickupDate: pickupIso, includeSample }),
+        })
+
+        const json = await resp.json()
+        if (!resp.ok || !json.checkoutUrl) {
+          setOrderError(json.error ?? 'Could not start checkout. Please try again.')
+          return
         }
-      })
 
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        navigateTo('account')
-        setAuthMessage('Please sign in to place a pre-order.')
+        // Redirect to Stripe — on success Stripe returns to /?payment=success
+        window.location.href = json.checkoutUrl
+        return
+      } catch (err) {
+        console.error('[placePreorder] stripe checkout error:', err)
+        setOrderError('Could not reach the payment server. Please try again.')
         return
       }
+    }
 
-      const { data, error } = await supabase.functions.invoke('create-stripe-checkout', {
-        body: { cartItems: cartLineItems, pickupDate: pickupIso, includeSample },
-      })
-
-      if (error || !data?.checkoutUrl) {
-        console.error('[placePreorder] Edge Function error:', error || data)
-        setOrderError(error?.message ?? data?.error ?? 'Could not start checkout. Please try again.')
-        return
-      }
-
-      // Redirect to Stripe — on success Stripe returns to /?payment=success
-      window.location.href = data.checkoutUrl
-      return
+    // ── Direct Supabase save (no Stripe) ────────────────────────────────────
+    try {
+      await _placePreorder()
     } catch (err) {
-      console.error('[placePreorder] stripe checkout exception:', err)
-      setOrderError('Could not reach the payment server. Please try again.')
-      return
+      console.error('[placePreorder] exception:', err)
+      setOrderError('Could not place your order. Please try again.')
     }
   }
 
-  // Fallback / legacy local-saving logic (keep if needed for manual/admin orders)
   const _placePreorder = async () => {
 
     const totalCents = cartItems.reduce((sum, item) => {
@@ -1400,7 +1411,7 @@ function App() {
                         <button type="submit" className="btn-small" disabled={authLoaderActive}>{authLoaderActive ? 'Creating account…' : 'Sign up'}</button>
                         <p className="account-mode-switch">Already have an account?{' '}<button type="button" className="account-mode-link" onClick={() => { setAccountMode('signin'); resetAuthState() }}>Sign in</button></p>
                         <div className="account-form-divider">or</div>
-                        <button type="button" className="btn-small btn-secondary" onClick={signInGoogle}>Sign up with Google</button>
+                        <button type="button" className="btn-small btn-secondary" onClick={signInGoogle}>Sign up / Sign in with Google</button>
                       </form>
                     ) : accountMode === 'forgot' ? (
                       <form className="account-form" onSubmit={handleForgotPassword}>
@@ -1426,7 +1437,7 @@ function App() {
                           {' · '}<button type="button" className="account-mode-link" onClick={() => { setAccountMode('forgot'); resetAuthState() }}>Forgot password?</button>
                         </p>
                         <div className="account-form-divider">or</div>
-                        <button type="button" className="btn-small btn-secondary" onClick={signInGoogle}>Sign in with Google</button>
+                        <button type="button" className="btn-small btn-secondary" onClick={signInGoogle}>Sign up / Sign in with Google</button>
                       </form>
                     )}
                   </>
