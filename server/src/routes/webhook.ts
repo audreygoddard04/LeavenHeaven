@@ -112,14 +112,14 @@ webhookRouter.post('/', async (req: Request, res: Response) => {
         if (existingOrder) {
           await supabase
             .from('orders')
-            .update({ status: 'paid' })
+            .update({ status: 'pending' })
             .eq('id', orderId)
         } else {
           // Order wasn't saved during checkout creation (schema issue) — insert now
           await supabase.from('orders').insert({
             id: orderId,
             user_id: userId,
-            status: 'paid',
+            status: 'pending',
             total_cents: totalCents,
             pickup_date: pickupDate,
             stripe_checkout_session_id: session.id,
@@ -167,12 +167,12 @@ webhookRouter.post('/', async (req: Request, res: Response) => {
         const pi = event.data.object as Stripe.PaymentIntent
         const orderId = pi.metadata?.order_id
         if (orderId && supabase) {
-          // Only update if not already paid via checkout.session.completed
+          // Only update if still in pending_payment (checkout.session.completed handles the rest)
           await supabase
             .from('orders')
-            .update({ status: 'paid' })
+            .update({ status: 'pending' })
             .eq('id', orderId)
-            .neq('status', 'paid')
+            .eq('status', 'pending_payment')
         }
         break
       }

@@ -1,18 +1,21 @@
 import { loafProducts } from '../data/products'
 
-const STATUS_ORDER = ['pending', 'confirmed', 'ready', 'completed']
+const STATUS_ORDER = ['paid', 'pending', 'confirmed', 'ready', 'completed']
 const STATUS_LABELS = {
+  paid: 'New (Paid via Stripe)',
   pending: 'Pending',
   confirmed: 'Confirmed',
   ready: 'Ready for pickup',
   completed: 'Completed',
 }
 const STATUS_NEXT = {
+  paid: 'confirmed',
   pending: 'confirmed',
   confirmed: 'ready',
   ready: 'completed',
 }
 const STATUS_NEXT_LABEL = {
+  paid: 'Mark confirmed',
   pending: 'Mark confirmed',
   confirmed: 'Mark ready',
   ready: 'Mark completed',
