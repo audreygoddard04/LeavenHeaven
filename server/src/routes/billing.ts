@@ -87,7 +87,7 @@ billingRouter.post('/create-checkout', requireUser, async (req, res) => {
     const baseRow = {
       id: orderId,
       user_id: user.id,
-      status: 'pending_payment',
+      status: 'pending',
       total_cents: totalCents,
       pickup_date: pickupDate,
       items: {
